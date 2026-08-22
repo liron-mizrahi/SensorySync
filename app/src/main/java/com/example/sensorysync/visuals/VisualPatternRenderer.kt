@@ -116,7 +116,7 @@ class VisualPatternRenderer {
         }
         renderSparkles(drawScope, dt)
 
-        // 5. Render Fluid Hydrodynamic Jellyfish with Smoke-like Ethereal Oral Arms
+        // 5. Render Fluid Hydrodynamic Jellyfish with Dynamic Breathing/Swimming Smoke Oral Arms
         renderFluidHydrodynamicJellyfish(drawScope, state, jx, jy, width, height)
 
         // 6. Render Foreground Floating Bokeh Orbs
@@ -316,7 +316,6 @@ class VisualPatternRenderer {
         val freq = state.strobeFrequencyHz.coerceIn(0.2f, 3.0f)
         val cycle = animTime * freq * 2.0 * PI
 
-        // 1. Biomechanical Peristaltic Wave Parameters
         val crownPulse = sin(cycle).toFloat()
         val flankPulse = sin(cycle - 0.75).toFloat()
         val rimPulse = sin(cycle - 1.50).toFloat()
@@ -419,8 +418,8 @@ class VisualPatternRenderer {
                 )
             }
 
-            // E. SMOKE-LIKE ETHEREAL ORAL ARMS (Multi-layered Billowing Wisps & Vapor Tendrils)
-            renderEtherealSmokeOralArms(drawScope, centerX, rimBaseY, bellRadiusX * rimExpansionX, baseScale, rimPulse, focusGlowBoost)
+            // E. DYNAMIC BREATHING & SWIMMING SMOKE ORAL ARMS
+            renderDynamicBreathingSmokeArms(drawScope, centerX, rimBaseY, bellRadiusX * rimExpansionX, baseScale, cycle, freq, focusGlowBoost)
 
             // F. Fluid 18-Point Hydrodynamic Bell Surface
             val fluidBellPath = Path().apply {
@@ -519,34 +518,49 @@ class VisualPatternRenderer {
         }
     }
 
-    private fun renderEtherealSmokeOralArms(
+    private fun renderDynamicBreathingSmokeArms(
         drawScope: DrawScope,
         centerX: Float,
         rimBaseY: Float,
         bellRadiusX: Float,
         baseScale: Float,
-        pulseVal: Float,
+        cycle: Double,
+        pulseFreq: Float,
         focusGlowBoost: Float
     ) {
-        val numPlumes = 4 // 4 Organic Central Smoke Plumes
-        val plumeLength = baseScale * 3.2f
+        val numPlumes = 4
+        val basePlumeLength = baseScale * 3.2f
 
         for (p in 0 until numPlumes) {
             val rootOffsetX = (p - 1.5f) * (bellRadiusX * 0.26f)
             val rootX = centerX + rootOffsetX
             val rootY = rimBaseY - 10f
 
-            // 1. Soft Volumetric Smoke Puffs (Gaussian Diffusion along plume spine)
-            val numPuffs = 9
+            // 1. Dynamic Breathing/Swimming Hydrodynamic Smoke Puffs
+            val numPuffs = 10
             for (i in 0 until numPuffs) {
                 val progress = i.toFloat() / (numPuffs - 1)
-                val waveX = sin(animTime * 3.2f + p * 1.4f + progress * 3.8f) * (22f * (progress + 0.3f))
-                val waveY = cos(animTime * 2.0f + p * 0.9f + progress * 2.5f) * 8f
-                val puffX = rootX + waveX
-                val puffY = rootY + progress * plumeLength + waveY
 
-                val puffRadius = baseScale * (0.16f + progress * 0.24f)
-                val puffAlpha = (0.28f * (1.0f - progress * 0.55f) + focusGlowBoost * 0.15f).coerceIn(0.05f, 0.65f)
+                // Propagating Jet Pulse Wave down the smoke column
+                val wavePhase = (cycle - progress * 2.8 - p * 0.35)
+                val breathPulse = sin(wavePhase).toFloat()
+                val powerThrust = max(breathPulse, 0.0f) // Jet ejection power
+                val inhaleRecoil = max(-breathPulse, 0.0f) // Recovery expansion
+
+                // Dynamic Longitudinal Stretch / Compression
+                val currentPlumeLength = basePlumeLength * (1.0f + powerThrust * 0.35f - inhaleRecoil * 0.15f)
+                val waveX = sin(animTime * 3.2f + p * 1.4f + progress * 3.8f) * (20f * (progress + 0.3f) * (1f + inhaleRecoil * 0.6f))
+                val waveY = cos(animTime * 2.0f + p * 0.9f + progress * 2.5f) * (8f + powerThrust * 12f)
+                val puffX = rootX + waveX
+                val puffY = rootY + progress * currentPlumeLength + waveY
+
+                // Dynamic Transverse Mushrooming (Smoke billows wide on inhale, constricts into jet on thrust)
+                val billowFactor = (1.0f + inhaleRecoil * 0.65f - powerThrust * 0.25f)
+                val puffRadius = baseScale * (0.16f + progress * 0.26f) * billowFactor
+
+                // Dynamic Luminescent Surge during swimming stroke
+                val surgeAlpha = 1.0f + powerThrust * 0.40f
+                val puffAlpha = ((0.28f * (1.0f - progress * 0.50f) * surgeAlpha) + focusGlowBoost * 0.15f).coerceIn(0.05f, 0.70f)
 
                 val puffColor = if (p % 2 == 0) Color(0xFFF48FB1) else Color(0xFFCE93D8)
                 drawScope.drawCircle(
@@ -564,30 +578,38 @@ class VisualPatternRenderer {
                 )
             }
 
-            // 2. Interweaving Ethereal Smoke Tendril Wisps (12 Billowing Fluid Micro-Strands per Plume)
+            // 2. Interweaving Breathing Smoke Wisps with Dynamic Jet Vortices (12 Strands per Plume)
             val numWisps = 12
             for (w in 0 until numWisps) {
                 val wispPath = Path()
-                val wispOffset = (w - (numWisps / 2f)) * 3.2f
+                val wispOffset = (w - (numWisps / 2f)) * 3.0f
                 wispPath.moveTo(rootX + wispOffset, rootY)
 
-                val segments = 22
+                val segments = 24
                 for (s in 1..segments) {
                     val progress = s.toFloat() / segments
-                    val noise1 = sin(animTime * (2.8f + w * 0.2f) + p * 1.5f + progress * (4.2f + w * 0.3f)) * (18f * (progress + 0.25f))
-                    val noise2 = cos(animTime * 1.6f + progress * 3.0f + w * 0.6f) * (14f * (progress + 0.25f))
-                    val vortexCurl = if (progress > 0.6f) sin(animTime * 4.0f + s * 0.8f + w) * (progress * 12f) else 0f
+                    val wavePhase = (cycle - progress * 2.8 - p * 0.35)
+                    val breathPulse = sin(wavePhase).toFloat()
+                    val powerThrust = max(breathPulse, 0.0f)
+                    val inhaleRecoil = max(-breathPulse, 0.0f)
 
-                    val wx = rootX + wispOffset * (1f + progress * 2.5f) + noise1 + noise2 + vortexCurl
-                    val wy = rootY + progress * plumeLength
+                    val currentPlumeLength = basePlumeLength * (1.0f + powerThrust * 0.35f - inhaleRecoil * 0.15f)
+
+                    // Dynamic turbulence and vortex eddy curls
+                    val vortexPower = (14f + powerThrust * 20f) * progress
+                    val noise1 = sin(animTime * (2.8f + w * 0.2f) + p * 1.5f + progress * (4.2f + w * 0.3f)) * (16f * (progress + 0.25f) * (1f + inhaleRecoil * 0.5f))
+                    val noise2 = cos(animTime * 1.6f + progress * 3.0f + w * 0.6f) * (12f * (progress + 0.25f))
+                    val dynamicVortex = if (progress > 0.5f) sin(animTime * 4.5f + s * 0.9f + w) * vortexPower else 0f
+
+                    val wx = rootX + wispOffset * (1f + progress * 2.5f * (1f + inhaleRecoil * 0.6f)) + noise1 + noise2 + dynamicVortex
+                    val wy = rootY + progress * currentPlumeLength
                     wispPath.lineTo(wx, wy)
                 }
 
-                // Dual-tone bioluminescent smoke colors with soft gradient fade
                 val isCyanSmoke = (w % 3 == 0)
                 val wispColor = if (isCyanSmoke) Color(0xFF80DEEA) else if (p % 2 == 0) Color(0xFFFF80AB) else Color(0xFFE1BEE7)
-                val wispAlpha = (0.24f - (w % 3) * 0.05f + focusGlowBoost * 0.15f).coerceIn(0.04f, 0.45f)
-                val strokeW = if (w % 2 == 0) 2.4f else 1.2f
+                val wispAlpha = (0.24f - (w % 3) * 0.04f + focusGlowBoost * 0.15f).coerceIn(0.04f, 0.48f)
+                val strokeW = if (w % 2 == 0) 2.2f else 1.1f
 
                 drawScope.drawPath(
                     path = wispPath,
