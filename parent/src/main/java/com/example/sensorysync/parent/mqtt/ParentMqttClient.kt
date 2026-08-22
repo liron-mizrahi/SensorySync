@@ -1,0 +1,189 @@
+package com.example.sensorysync.parent.mqtt
+
+import android.content.Context
+import org.eclipse.paho.client.mqttv3.*
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import org.json.JSONObject
+import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
+
+data class ParentControlState(
+    val brokerHost: String = "192.168.1.96",
+    val brokerPort: Int = 1883,
+    val username: String = "harel_tablet",
+    val password: String = "12345678",
+    val topicPrefix: String = "tablet/control",
+    val isMqttConnected: Boolean = false,
+    val statusMessage: String = "Disconnected",
+    
+    // Remote Child Tablet Telemetry
+    val isTabletOnline: Boolean = false,
+    val activePatternId: Int = 1,
+    val activePatternTitle: String = "Gentle Floating Stars",
+    val strobeFrequencyHz: Float = 0.5f,
+    val primaryHue: Float = 200f,
+    val speedMultiplier: Float = 0.6f,
+    val isFaceLocked: Boolean = false,
+    val targetFaceTrackingId: Int = -1,
+    val targetFaceStatusText: String = "No Face Locked",
+    val isGazeDetected: Boolean = false,
+    val activeEyeContactSeconds: Long = 0L,
+    val sessionDurationSeconds: Long = 0L,
+    val longestFocusStreakSeconds: Long = 0L,
+    val engagementScorePercent: Int = 0,
+
+    // Real-Time Camera Preview Stream from Tablet
+    val cameraSnapshotBase64: String? = null,
+
+    // Acquired / Saved Target Child Face Snapshot
+    val lockedFaceSnapshotBase64: String? = null,
+
+    // Tablet Camera Preview Visibility Toggle (Default: false / hidden)
+    val showChildCameraPreview: Boolean = false
+)
+
+
+class ParentMqttClient(
+    private val context: Context,
+    private val onStateUpdate: (ParentControlState.() -> ParentControlState) -> Unit
+) {
+    private var mqttClient: MqttClient? = null
+    private val watchdog: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+    private val prefs = context.getSharedPreferences("parent_app_cache", Context.MODE_PRIVATE)
+
+    @Volatile
+    private var lastTelemetryTimestampMs: Long = 0L
+
+    init {
+        // Load saved face snapshot from cache on startup
+        val cachedFace = prefs.getString("cached_locked_face_base64", null)
+        if (cachedFace != null) {
+            onStateUpdate { copy(lockedFaceSnapshotBase64 = cachedFace) }
+        }
+
+        // Watchdog task every 2 seconds to mark tablet offline if telemetry stops
+        watchdog.scheduleAtFixedRate({
+            val now = System.currentTimeMillis()
+            if (lastTelemetryTimestampMs > 0 && (now - lastTelemetryTimestampMs > 4000)) {
+                onStateUpdate { copy(isTabletOnline = false) }
+            }
+        }, 2, 2, TimeUnit.SECONDS)
+    }
+
+    fun connect(state: ParentControlState) {
+        disconnect()
+
+        val serverUri = "tcp://${state.brokerHost}:${state.brokerPort}"
+        val clientId = "SensorySyncParent_" + UUID.randomUUID().toString().take(6)
+
+        try {
+            onStateUpdate { copy(statusMessage = "Connecting to $serverUri...", isMqttConnected = false, isTabletOnline = false) }
+            mqttClient = MqttClient(serverUri, clientId, MemoryPersistence())
+
+            val connOpts = MqttConnectOptions().apply {
+                isCleanSession = true
+                connectionTimeout = 8
+                keepAliveInterval = 15
+                if (state.username.isNotBlank()) {
+                    userName = state.username
+                    password = state.password.toCharArray()
+                }
+            }
+
+            mqttClient?.setCallback(object : MqttCallback {
+                override fun connectionLost(cause: Throwable?) {
+                    onStateUpdate { copy(isMqttConnected = false, isTabletOnline = false, statusMessage = "Connection lost") }
+                }
+
+                override fun messageArrived(topic: String?, message: MqttMessage?) {
+                    if (topic != null && message != null) {
+                        handleIncomingMessage(topic, state.topicPrefix, message.toString())
+                    }
+                }
+
+                override fun deliveryComplete(token: IMqttDeliveryToken?) {}
+            })
+
+            Thread {
+                try {
+                    mqttClient?.connect(connOpts)
+                    val subscribeTopic = "${state.topicPrefix}/#"
+                    mqttClient?.subscribe(subscribeTopic)
+                    onStateUpdate { copy(isMqttConnected = true, statusMessage = "Connected to ${state.brokerHost}") }
+                } catch (e: Exception) {
+                    onStateUpdate { copy(isMqttConnected = false, isTabletOnline = false, statusMessage = "Error: ${e.localizedMessage}") }
+                }
+            }.start()
+
+        } catch (e: Exception) {
+            onStateUpdate { copy(isMqttConnected = false, isTabletOnline = false, statusMessage = "Failed: ${e.localizedMessage}") }
+        }
+    }
+
+    private fun handleIncomingMessage(topic: String, prefix: String, payload: String) {
+        if (topic.endsWith("/camera_snapshot")) {
+            onStateUpdate { copy(cameraSnapshotBase64 = payload) }
+            return
+        }
+
+        if (topic.endsWith("/locked_face_snapshot")) {
+            prefs.edit().putString("cached_locked_face_base64", payload).apply()
+            onStateUpdate { copy(lockedFaceSnapshotBase64 = payload) }
+            return
+        }
+
+        if (!topic.startsWith("$prefix/status")) return
+        try {
+            lastTelemetryTimestampMs = System.currentTimeMillis()
+            val json = JSONObject(payload)
+            onStateUpdate {
+                copy(
+                    isTabletOnline = true,
+                    activePatternId = json.optInt("activePatternId", 1),
+                    activePatternTitle = json.optString("activePattern", "Gentle Floating Stars"),
+                    strobeFrequencyHz = json.optDouble("strobeFrequencyHz", 0.5).toFloat(),
+                    primaryHue = json.optDouble("primaryHue", 200.0).toFloat(),
+                    speedMultiplier = json.optDouble("speedMultiplier", 0.6).toFloat(),
+                    isFaceLocked = json.optBoolean("isFaceLocked", false),
+                    targetFaceTrackingId = json.optInt("targetFaceTrackingId", -1),
+                    targetFaceStatusText = json.optString("targetFaceStatusText", "No Face Locked"),
+                    isGazeDetected = json.optBoolean("gazeDetected", false),
+                    activeEyeContactSeconds = json.optLong("activeEyeContactSeconds", 0L),
+                    sessionDurationSeconds = json.optLong("sessionDurationSeconds", 0L),
+                    longestFocusStreakSeconds = json.optLong("longestFocusStreakSeconds", 0L),
+                    engagementScorePercent = json.optInt("engagementScorePercent", 0),
+                    showChildCameraPreview = json.optBoolean("showCameraPreview", false)
+                )
+            }
+
+        } catch (_: Exception) {}
+    }
+
+    fun sendCommand(topicPrefix: String, subTopic: String, payload: String) {
+        if (mqttClient?.isConnected != true) return
+        try {
+            val fullTopic = "$topicPrefix/$subTopic"
+            val message = MqttMessage(payload.toByteArray()).apply { qos = 0 }
+            mqttClient?.publish(fullTopic, message)
+        } catch (_: Exception) {}
+    }
+
+    fun disconnect() {
+        try {
+            if (mqttClient?.isConnected == true) {
+                mqttClient?.disconnect()
+            }
+            mqttClient?.close()
+        } catch (_: Exception) {}
+        mqttClient = null
+    }
+
+    fun shutdown() {
+        disconnect()
+        try {
+            watchdog.shutdownNow()
+        } catch (_: Exception) {}
+    }
+}
