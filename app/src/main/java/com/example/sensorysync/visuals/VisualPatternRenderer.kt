@@ -58,12 +58,13 @@ class VisualPatternRenderer {
 
     private var animTime = 0f
 
-    // Jellyfish position and 3D swimming motion dynamics
+    // Jellyfish position, inertial velocity, and guarded angular steering dynamics
     private var jellyX = 0.5f
     private var jellyY = 0.5f
+    private var jellyVx = 0f
+    private var jellyVy = 0f
     private var jellyHeading = 0f
-    private var targetHeading = 0f
-    private var swimSpeed = 0.0014f
+    private var swimBaseSpeed = 0.0011f
     private var jellyTiltZ = 0f
 
     // Focus state output
@@ -81,8 +82,8 @@ class VisualPatternRenderer {
         val width = drawScope.size.width
         val height = drawScope.size.height
 
-        // 1. Update Autonomous 3D Swimming Path (Smooth Wandering across screen)
-        updateJellyfishMovement(dt, state.speedMultiplier, state.strobeFrequencyHz)
+        // 1. Update Autonomous 3D Swimming Path with Rotation & Translation Guards
+        updateJellyfishMovementGuarded(dt, state.speedMultiplier, state.strobeFrequencyHz)
 
         val jx = jellyX * width
         val jy = jellyY * height
@@ -110,7 +111,7 @@ class VisualPatternRenderer {
         }
         renderSparkles(drawScope, dt)
 
-        // 5. Render 3D Bioluminescent Cosmic Jellyfish (Scaled for Large Tablet Screen)
+        // 5. Render 3D Bioluminescent Cosmic Jellyfish
         render3DJellyfish(drawScope, state, jx, jy, width, height)
 
         // 6. Render Real-Time Eye Gaze Tracking Point
@@ -119,50 +120,79 @@ class VisualPatternRenderer {
         }
     }
 
-    private fun updateJellyfishMovement(dt: Float, speedMul: Float, pulseFreq: Float) {
+    private fun updateJellyfishMovementGuarded(dt: Float, speedMul: Float, pulseFreq: Float) {
         val freq = pulseFreq.coerceIn(0.2f, 3.0f)
         val pulsePhase = (animTime * freq * 2.0 * PI)
-        val pulsePower = sin(pulsePhase).toFloat()
+        val pulsePower = ((sin(pulsePhase) + 1.0) / 2.0).toFloat()
 
-        // Organic wandering trajectory
-        val wanderAngle = (
-            sin(animTime * 0.25f) * 1.25f +
-            cos(animTime * 0.16f) * 0.95f +
-            sin(animTime * 0.48f) * 0.4f
-        )
-        targetHeading = wanderAngle
+        // 1. Organic Lissajous Wander Vectors (Smooth continuous curves)
+        val wanderForceX = cos(animTime * 0.18f) * 0.7f + sin(animTime * 0.36f) * 0.3f
+        val wanderForceY = sin(animTime * 0.14f) * 0.5f + cos(animTime * 0.32f) * 0.25f
 
-        // Smooth angular steering
-        val angleDiff = (targetHeading - jellyHeading)
-        jellyHeading += angleDiff * (dt * 1.5f)
-        jellyTiltZ = sin(animTime * 1.8f) * 10f
+        // 2. Continuous Soft Margin Repulsion (Smooth fluid steering away from boundaries)
+        var repulseX = 0f
+        var repulseY = 0f
 
-        // Forward thrust during contraction pulse
-        val thrust = if (pulsePower > 0f) (pulsePower * pulsePower * 1.8f) else 0.25f
-        val currentSpeed = swimSpeed * speedMul * (0.4f + thrust)
+        val marginMinX = 0.22f
+        val marginMaxX = 0.78f
+        val marginMinY = 0.22f
+        val marginMaxY = 0.76f
 
-        val vx = cos(jellyHeading) * currentSpeed * 1.35f
-        val vy = (sin(jellyHeading) * currentSpeed * 0.75f) - 0.00015f
-
-        jellyX += vx
-        jellyY += vy
-
-        // Smooth boundaries (wide full-screen wander)
-        if (jellyX < 0.18f) {
-            jellyX = 0.18f
-            jellyHeading = abs(jellyHeading)
-        } else if (jellyX > 0.82f) {
-            jellyX = 0.82f
-            jellyHeading = PI.toFloat() - abs(jellyHeading)
+        if (jellyX < marginMinX) {
+            val dist = (marginMinX - jellyX) / marginMinX
+            repulseX += dist * dist * 4.0f
+        } else if (jellyX > marginMaxX) {
+            val dist = (jellyX - marginMaxX) / (1f - marginMaxX)
+            repulseX -= dist * dist * 4.0f
         }
 
-        if (jellyY < 0.18f) {
-            jellyY = 0.18f
-            jellyHeading = (PI * 0.5).toFloat()
-        } else if (jellyY > 0.78f) {
-            jellyY = 0.78f
-            jellyHeading = -(PI * 0.5).toFloat()
+        if (jellyY < marginMinY) {
+            val dist = (marginMinY - jellyY) / marginMinY
+            repulseY += dist * dist * 4.0f
+        } else if (jellyY > marginMaxY) {
+            val dist = (jellyY - marginMaxY) / (1f - marginMaxY)
+            repulseY -= dist * dist * 4.0f
         }
+
+        // 3. Desired Steering Angle
+        val steerX = wanderForceX + repulseX
+        val steerY = wanderForceY + repulseY
+        val targetAngle = atan2(steerY, steerX)
+
+        // 4. Strict Angular Rotation Guard (Slew Rate Limiter - Prevents Fast Flipping & Snapping)
+        val maxAngularSpeed = 1.15f // Maximum 1.15 radians/sec (~65 deg/sec)
+        var angleDiff = (targetAngle - jellyHeading)
+        // Normalize angleDiff to shortest arc [-PI, PI]
+        while (angleDiff > PI) angleDiff -= (2.0 * PI).toFloat()
+        while (angleDiff < -PI) angleDiff += (2.0 * PI).toFloat()
+
+        val maxStep = maxAngularSpeed * dt
+        val clampedTurn = angleDiff.coerceIn(-maxStep, maxStep)
+        jellyHeading += clampedTurn
+
+        // 5. Smooth Speed & Inertial Translation Guard (No Bumpy Bounces)
+        val thrust = if (pulsePower > 0.35f) ((pulsePower - 0.35f) * 1.5f) else 0.15f
+        val targetSpeed = swimBaseSpeed * speedMul * (0.45f + thrust)
+
+        val desiredVx = cos(jellyHeading) * targetSpeed * 1.2f
+        val desiredVy = sin(jellyHeading) * targetSpeed * 0.75f
+
+        // Inertial damping
+        val accelRate = (2.2f * dt).coerceIn(0.01f, 0.2f)
+        jellyVx += (desiredVx - jellyVx) * accelRate
+        jellyVy += (desiredVy - jellyVy) * accelRate
+
+        // Translation update
+        jellyX += jellyVx
+        jellyY += jellyVy
+
+        // Soft safe boundary clamping (prevents drifting off-screen without bouncing)
+        jellyX = jellyX.coerceIn(0.14f, 0.86f)
+        jellyY = jellyY.coerceIn(0.16f, 0.82f)
+
+        // 6. Smooth Banking / Roll Tilt (Guarded)
+        val targetTilt = (clampedTurn / maxStep.coerceAtLeast(0.001f)) * 10f
+        jellyTiltZ += (targetTilt - jellyTiltZ) * (2.5f * dt)
     }
 
     private fun renderSpores(drawScope: DrawScope, state: ControlState, width: Float, height: Float) {
@@ -241,7 +271,7 @@ class VisualPatternRenderer {
 
         // Responsive Scale: Scaled prominently for tablet screens
         val minDim = width.coerceAtMost(height)
-        val baseScale = minDim * 0.16f // Generous, prominent size
+        val baseScale = minDim * 0.16f
 
         val bellRadiusX = baseScale * (1f + (1f - pulseVal) * 0.32f)
         val bellRadiusY = baseScale * 0.78f * (1f + pulseVal * 0.32f)
@@ -475,7 +505,6 @@ class VisualPatternRenderer {
             tentaclePath.moveTo(rootX, rootY)
 
             for (j in 1 until jointsPerTentacle) {
-
                 val prevJoint = joints[j - 1]
                 val wavePhase = animTime * 4.2f + t * 0.45f + j * 0.55f
                 val waveAmplitude = (9.0f + j * 3.0f) * (1f + (1f - pulseVal) * 0.4f)
@@ -485,10 +514,10 @@ class VisualPatternRenderer {
                 val targetX = prevJoint.x + waveX * 0.38f
                 val targetY = prevJoint.y + dragY
 
-                // Damped spring physics
+                // Damped spring physics (silky smooth flow)
                 val currentJ = joints[j]
-                val newX = currentJ.x + (targetX - currentJ.x) * 0.42f
-                val newY = currentJ.y + (targetY - currentJ.y) * 0.42f
+                val newX = currentJ.x + (targetX - currentJ.x) * 0.35f
+                val newY = currentJ.y + (targetY - currentJ.y) * 0.35f
                 joints[j] = Offset(newX, newY)
 
                 tentaclePath.lineTo(newX, newY)
