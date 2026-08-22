@@ -46,7 +46,15 @@ data class ParentControlState(
     // Jellyfish Engagement & Tracking & Size
     val jellyfishScale: Float = 0.5f,
     val isGazeFocusingOnJellyfish: Boolean = false,
-    val gazeJellyfishDistance: Float = 1.0f
+    val gazeJellyfishDistance: Float = 1.0f,
+
+    // Bubble Bloom Controls & Live Metrics
+    val bubbleCount: Int = 12,
+    val bubbleScale: Float = 1.0f,
+    val bubbleDwellTimeSec: Float = 1.2f,
+    val bubblePoppedCount: Long = 0L,
+    val focusedBubbleIndex: Int = -1,
+    val bubbleDwellProgress: Float = 0.0f
 )
 
 
@@ -162,6 +170,12 @@ class ParentMqttClient(
                     engagementScorePercent = json.optInt("engagementScorePercent", 0),
                     showChildCameraPreview = json.optBoolean("showCameraPreview", false),
                     jellyfishScale = json.optDouble("jellyfishScale", 0.5).toFloat(),
+                    bubbleCount = json.optInt("bubbleCount", 12),
+                    bubbleScale = json.optDouble("bubbleScale", 1.0).toFloat(),
+                    bubbleDwellTimeSec = json.optDouble("bubbleDwellTimeSec", 1.2).toFloat(),
+                    bubblePoppedCount = json.optLong("bubblePoppedCount", 0L),
+                    focusedBubbleIndex = json.optInt("focusedBubbleIndex", -1),
+                    bubbleDwellProgress = json.optDouble("bubbleDwellProgress", 0.0).toFloat(),
                     isGazeFocusingOnJellyfish = json.optBoolean("isGazeFocusingOnJellyfish", false),
                     gazeJellyfishDistance = json.optDouble("gazeJellyfishDistance", 1.0).toFloat()
                 )

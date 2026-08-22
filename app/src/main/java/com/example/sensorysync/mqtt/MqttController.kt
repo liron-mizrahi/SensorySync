@@ -97,6 +97,18 @@ class MqttController(
                     val scale = value.toFloatOrNull()?.coerceIn(0.2f, 2.0f) ?: jellyfishScale
                     copy(jellyfishScale = scale)
                 }
+                "bubble_count" -> {
+                    val count = value.toIntOrNull()?.coerceIn(3, 25) ?: bubbleCount
+                    copy(bubbleCount = count)
+                }
+                "bubble_scale", "bubble_size" -> {
+                    val scale = value.toFloatOrNull()?.coerceIn(0.5f, 2.0f) ?: bubbleScale
+                    copy(bubbleScale = scale)
+                }
+                "bubble_dwell_time", "dwell_time" -> {
+                    val dwell = value.toFloatOrNull()?.coerceIn(0.5f, 3.0f) ?: bubbleDwellTimeSec
+                    copy(bubbleDwellTimeSec = dwell)
+                }
 
                 "camera_preview" -> {
                     val show = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
@@ -167,6 +179,12 @@ class MqttController(
                 put("engagementScorePercent", state.engagementMetrics.engagementScorePercent)
                 put("showCameraPreview", state.showCameraPreview)
                 put("jellyfishScale", state.jellyfishScale)
+                put("bubbleCount", state.bubbleCount)
+                put("bubbleScale", state.bubbleScale)
+                put("bubbleDwellTimeSec", state.bubbleDwellTimeSec)
+                put("bubblePoppedCount", state.bubblePoppedCount)
+                put("focusedBubbleIndex", state.focusedBubbleIndex ?: -1)
+                put("bubbleDwellProgress", state.bubbleDwellProgress)
                 put("isGazeFocusingOnJellyfish", state.isGazeFocusingOnJellyfish)
                 put("gazeJellyfishDistance", state.gazeJellyfishDistance)
                 put("jellyfishX", state.jellyfishPosition.x)

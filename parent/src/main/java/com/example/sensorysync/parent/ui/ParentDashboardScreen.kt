@@ -424,95 +424,248 @@ fun ParentDashboardScreen(
                 }
             }
 
-            // 4. Cosmic Jellyfish Controls & Fine-Tuning
+            // 4. Visual Pattern Selector (Cosmic Jellyfish vs Bubble Bloom)
             Text(
-                text = "🪼 Cosmic Jellyfish Controls",
+                text = "🎨 Visual Pattern Mode",
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f)
             )
 
-            Surface(
+            TabRow(
+                selectedTabIndex = if (state.activePatternId == 2) 1 else 0,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .alpha(if (isOnline) 1.0f else 0.5f),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(12.dp)
+                    .alpha(if (isOnline) 1.0f else 0.5f)
+                    .clip(RoundedCornerShape(10.dp))
             ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Tab(
+                    selected = (state.activePatternId == 1),
+                    onClick = {
+                        if (isOnline) {
+                            mqttClient.sendCommand(state.topicPrefix, "pattern", "1")
+                        }
+                    },
+                    text = { Text("🪼 Cosmic Jellyfish", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                )
+                Tab(
+                    selected = (state.activePatternId == 2),
+                    onClick = {
+                        if (isOnline) {
+                            mqttClient.sendCommand(state.topicPrefix, "pattern", "2")
+                        }
+                    },
+                    text = { Text("🫧 Bubble Bloom", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                )
+            }
+
+            // 5. Pattern-Specific Control Panels
+            if (state.activePatternId == 2) {
+                // BUBBLE BLOOM CONTROLS
+                Text(
+                    text = "🫧 Bubble Bloom Controls",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f)
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .alpha(if (isOnline) 1.0f else 0.5f),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Column {
-                        Text(
-                            text = "Jellyfish Size: ${"%.2f".format(state.jellyfishScale)}x (${(state.jellyfishScale * 100).toInt()}%)",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = state.jellyfishScale.coerceIn(0.2f, 2.0f),
-                            onValueChange = { size ->
-                                if (isOnline) {
-                                    mqttClient.sendCommand(state.topicPrefix, "jellyfish_scale", "%.2f".format(size))
-                                }
-                            },
-                            enabled = isOnline,
-                            valueRange = 0.2f..2.0f
-                        )
-                    }
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Popped Bubbles Stats Banner
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Total Bubbles Popped:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Badge(containerColor = Color(0xFFE040FB)) {
+                                Text(
+                                    text = "${state.bubblePoppedCount} 💥",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
 
-                    Column {
-                        Text(
-                            text = "Swimming Speed: ${"%.1f".format(state.speedMultiplier)}x",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = state.speedMultiplier.coerceIn(0.2f, 2.0f),
-                            onValueChange = { spd ->
-                                if (isOnline) {
-                                    mqttClient.sendCommand(state.topicPrefix, "speed", "%.2f".format(spd))
+                        if (state.focusedBubbleIndex != -1) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Bubble Focus Charge:", fontSize = 11.sp, color = Color(0xFF00BCD4))
+                                    Text("${(state.bubbleDwellProgress * 100).toInt()}%", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
-                            },
-                            enabled = isOnline,
-                            valueRange = 0.2f..2.0f
-                        )
-                    }
+                                LinearProgressIndicator(
+                                    progress = { state.bubbleDwellProgress },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    color = Color(0xFF00E5FF),
+                                    trackColor = Color.Gray.copy(alpha = 0.3f)
+                                )
+                            }
+                        }
 
-                    Column {
-                        Text(
-                            text = "Breathing Pulse Frequency: ${"%.1f".format(state.strobeFrequencyHz)} Hz (Safe Mode)",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = state.strobeFrequencyHz.coerceIn(0.2f, 3.0f),
-                            onValueChange = { freq ->
-                                if (isOnline) {
-                                    mqttClient.sendCommand(state.topicPrefix, "strobe_freq", "%.1f".format(freq))
-                                }
-                            },
-                            enabled = isOnline,
-                            valueRange = 0.2f..3.0f
-                        )
-                    }
+                        // Bubble Count Slider
+                        Column {
+                            Text(
+                                text = "Bubble Count: ${state.bubbleCount}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.bubbleCount.toFloat().coerceIn(3f, 25f),
+                                onValueChange = { count ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "bubble_count", count.toInt().toString())
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 3f..25f,
+                                steps = 22
+                            )
+                        }
 
-                    Column {
-                        Text(
-                            text = "Bioluminescent Hue: ${state.primaryHue.toInt()}°",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = state.primaryHue,
-                            onValueChange = { hue ->
-                                if (isOnline) {
-                                    mqttClient.sendCommand(state.topicPrefix, "color_hue", hue.toInt().toString())
-                                }
-                            },
-                            enabled = isOnline,
-                            valueRange = 0f..360f
-                        )
+                        // Bubble Size Slider
+                        Column {
+                            Text(
+                                text = "Bubble Size: ${"%.2f".format(state.bubbleScale)}x (${(state.bubbleScale * 100).toInt()}%)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.bubbleScale.coerceIn(0.5f, 2.0f),
+                                onValueChange = { size ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "bubble_scale", "%.2f".format(size))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.5f..2.0f
+                            )
+                        }
+
+                        // Pop Dwell Time Slider
+                        Column {
+                            Text(
+                                text = "Gaze Pop Dwell Time: ${"%.1f".format(state.bubbleDwellTimeSec)}s",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.bubbleDwellTimeSec.coerceIn(0.5f, 3.0f),
+                                onValueChange = { dwell ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "bubble_dwell_time", "%.1f".format(dwell))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.5f..3.0f
+                            )
+                        }
+                    }
+                }
+            } else {
+                // COSMIC JELLYFISH CONTROLS
+                Text(
+                    text = "🪼 Cosmic Jellyfish Controls",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f)
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .alpha(if (isOnline) 1.0f else 0.5f),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = "Jellyfish Size: ${"%.2f".format(state.jellyfishScale)}x (${(state.jellyfishScale * 100).toInt()}%)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.jellyfishScale.coerceIn(0.2f, 2.0f),
+                                onValueChange = { size ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "jellyfish_scale", "%.2f".format(size))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.2f..2.0f
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "Swimming Speed: ${"%.1f".format(state.speedMultiplier)}x",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.speedMultiplier.coerceIn(0.2f, 2.0f),
+                                onValueChange = { spd ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "speed", "%.2f".format(spd))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.2f..2.0f
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "Breathing Pulse Frequency: ${"%.1f".format(state.strobeFrequencyHz)} Hz (Safe Mode)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.strobeFrequencyHz.coerceIn(0.2f, 3.0f),
+                                onValueChange = { freq ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "strobe_freq", "%.1f".format(freq))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.2f..3.0f
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "Bioluminescent Hue: ${state.primaryHue.toInt()}°",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.primaryHue,
+                                onValueChange = { hue ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "color_hue", hue.toInt().toString())
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0f..360f
+                            )
+                        }
                     }
                 }
             }

@@ -3,7 +3,8 @@ package com.example.sensorysync.model
 import androidx.compose.ui.geometry.Offset
 
 enum class VisualPattern(val id: Int, val title: String, val description: String) {
-    COSMIC_JELLYFISH(1, "Cosmic Jellyfish", "Bioluminescent swimming jellyfish with gaze-following tracking & focus rewards")
+    COSMIC_JELLYFISH(1, "Cosmic Jellyfish", "Bioluminescent swimming jellyfish with gaze-following tracking & focus rewards"),
+    BUBBLE_BLOOM(2, "Bubble Bloom", "Iridescent cosmic soap bubbles with gaze-dwelling pop bursts")
 }
 
 enum class HandGesture {
@@ -83,6 +84,14 @@ data class ControlState(
     val jellyfishPosition: Offset = Offset(0.5f, 0.5f),
     val isGazeFocusingOnJellyfish: Boolean = false,
     val gazeJellyfishDistance: Float = 1.0f,
+
+    // Bubble Bloom State & Controls
+    val bubbleCount: Int = 12,
+    val bubbleScale: Float = 1.0f,
+    val bubbleDwellTimeSec: Float = 1.2f,
+    val bubblePoppedCount: Long = 0L,
+    val focusedBubbleIndex: Int? = null,
+    val bubbleDwellProgress: Float = 0.0f,
 
     // Target Face Locking
     val isFaceLocked: Boolean = false,

@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.view.PreviewView
 import com.example.sensorysync.model.ControlState
+import com.example.sensorysync.model.VisualPattern
+import com.example.sensorysync.visuals.BubbleBloomRenderer
 import com.example.sensorysync.visuals.VisualPatternRenderer
 
 @Composable
@@ -31,18 +33,22 @@ fun SensoryScreen(
     onBindCameraPreview: (PreviewView) -> Unit,
     onExitApp: () -> Unit
 ) {
-    val renderer = remember { VisualPatternRenderer() }
+    val jellyfishRenderer = remember { VisualPatternRenderer() }
+    val bubbleRenderer = remember { BubbleBloomRenderer() }
     var lastFrameTime by remember { mutableStateOf(System.nanoTime()) }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // Intercept all full-screen touches when child lock is active
-            .pointerInput(Unit) {
+            .pointerInput(state.activePattern, state.bubbleScale) {
                 detectTapGestures(
-                    onTap = {
-                        // Touches are intentionally ignored to prevent child interference
+                    onTap = { offset ->
+                        if (state.activePattern == VisualPattern.BUBBLE_BLOOM) {
+                            val w = size.width.toFloat()
+                            val h = size.height.toFloat()
+                            bubbleRenderer.handleTap(offset.x / w, offset.y / h, w, h, state.bubbleScale)
+                        }
                     }
                 )
             }
@@ -53,21 +59,43 @@ fun SensoryScreen(
             val deltaTime = ((currentTime - lastFrameTime) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
             lastFrameTime = currentTime
 
-            renderer.render(this, state, deltaTime)
+            when (state.activePattern) {
+                VisualPattern.COSMIC_JELLYFISH -> {
+                    jellyfishRenderer.render(this, state, deltaTime)
 
-            val isFocused = renderer.isCurrentlyFocused
-            val jPos = renderer.latestJellyfishPos
-            val dist = renderer.gazeJellyDistance
+                    val isFocused = jellyfishRenderer.isCurrentlyFocused
+                    val jPos = jellyfishRenderer.latestJellyfishPos
+                    val dist = jellyfishRenderer.gazeJellyDistance
 
-            if (state.isGazeFocusingOnJellyfish != isFocused ||
-                state.jellyfishPosition != jPos
-            ) {
-                onStateChange {
-                    copy(
-                        isGazeFocusingOnJellyfish = isFocused,
-                        jellyfishPosition = jPos,
-                        gazeJellyfishDistance = dist
-                    )
+                    if (state.isGazeFocusingOnJellyfish != isFocused ||
+                        state.jellyfishPosition != jPos
+                    ) {
+                        onStateChange {
+                            copy(
+                                isGazeFocusingOnJellyfish = isFocused,
+                                jellyfishPosition = jPos,
+                                gazeJellyfishDistance = dist
+                            )
+                        }
+                    }
+                }
+                VisualPattern.BUBBLE_BLOOM -> {
+                    bubbleRenderer.render(this, state, deltaTime)
+
+                    val focusedIdx = bubbleRenderer.activeFocusedIndex
+                    val dwellProg = bubbleRenderer.currentDwellProgress
+
+                    if (state.focusedBubbleIndex != focusedIdx ||
+                        state.bubbleDwellProgress != dwellProg
+                    ) {
+                        onStateChange {
+                            copy(
+                                focusedBubbleIndex = focusedIdx,
+                                bubbleDwellProgress = dwellProg,
+                                isGazeFocusingOnJellyfish = (focusedIdx != null)
+                            )
+                        }
+                    }
                 }
             }
 
