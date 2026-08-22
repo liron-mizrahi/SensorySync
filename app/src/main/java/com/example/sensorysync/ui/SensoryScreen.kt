@@ -37,6 +37,15 @@ fun SensoryScreen(
     val bubbleRenderer = remember { BubbleBloomRenderer() }
     var lastFrameTime by remember { mutableStateOf(System.nanoTime()) }
 
+    LaunchedEffect(state.bubbleActionTrigger) {
+        val trigger = state.bubbleActionTrigger ?: return@LaunchedEffect
+        when {
+            trigger.startsWith("POP_RANDOM") -> bubbleRenderer.triggerPopRandom()
+            trigger.startsWith("POP_ALL") -> bubbleRenderer.triggerPopAll()
+            trigger.startsWith("RESET") -> bubbleRenderer.triggerResetBubbles()
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()

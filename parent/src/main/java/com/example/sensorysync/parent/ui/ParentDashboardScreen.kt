@@ -480,21 +480,81 @@ fun ParentDashboardScreen(
                         modifier = Modifier.padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Popped Bubbles Stats Banner
+                        // Popped Bubbles Stats Banner & Actions
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("Total Bubbles Popped:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            Badge(containerColor = Color(0xFFE040FB)) {
-                                Text(
-                                    text = "${state.bubblePoppedCount} 💥",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Badge(containerColor = Color(0xFFE040FB)) {
+                                    Text(
+                                        text = "${state.bubblePoppedCount} 💥",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                TextButton(
+                                    onClick = {
+                                        if (isOnline) {
+                                            mqttClient.sendCommand(state.topicPrefix, "command", "RESET_POP_COUNT")
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                    enabled = isOnline
+                                ) {
+                                    Text("Reset", fontSize = 10.sp)
+                                }
+                            }
+                        }
+
+                        // Remote Pop Quick Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "command", "POP_RANDOM")
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9C27B0)),
+                                contentPadding = PaddingValues(vertical = 4.dp),
+                                enabled = isOnline
+                            ) {
+                                Text("💥 Pop Bubble", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Button(
+                                onClick = {
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "command", "POP_ALL")
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63)),
+                                contentPadding = PaddingValues(vertical = 4.dp),
+                                enabled = isOnline
+                            ) {
+                                Text("🎆 Pop All", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "command", "RESET_BUBBLES")
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                enabled = isOnline
+                            ) {
+                                Text("🔄 Respawn", fontSize = 11.sp)
                             }
                         }
 
@@ -552,6 +612,25 @@ fun ParentDashboardScreen(
                                 },
                                 enabled = isOnline,
                                 valueRange = 0.5f..2.0f
+                            )
+                        }
+
+                        // Floating Speed Slider
+                        Column {
+                            Text(
+                                text = "Floating & Drift Speed: ${"%.1f".format(state.speedMultiplier)}x",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.speedMultiplier.coerceIn(0.2f, 2.0f),
+                                onValueChange = { spd ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "speed", "%.2f".format(spd))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.2f..2.0f
                             )
                         }
 

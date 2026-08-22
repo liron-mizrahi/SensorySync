@@ -92,6 +92,7 @@ data class ControlState(
     val bubblePoppedCount: Long = 0L,
     val focusedBubbleIndex: Int? = null,
     val bubbleDwellProgress: Float = 0.0f,
+    val bubbleActionTrigger: String? = null,
 
     // Target Face Locking
     val isFaceLocked: Boolean = false,

@@ -141,6 +141,18 @@ class MqttController(
                         "CALIBRATE" -> {
                             copy(calibrationData = calibrationData.copy(isCalibrating = true))
                         }
+                        "POP_RANDOM", "POP_BUBBLE" -> {
+                            copy(bubbleActionTrigger = "POP_RANDOM_${System.currentTimeMillis()}")
+                        }
+                        "POP_ALL", "POP_ALL_BUBBLES" -> {
+                            copy(bubbleActionTrigger = "POP_ALL_${System.currentTimeMillis()}")
+                        }
+                        "RESET_BUBBLES" -> {
+                            copy(bubbleActionTrigger = "RESET_${System.currentTimeMillis()}")
+                        }
+                        "RESET_POP_COUNT" -> {
+                            copy(bubblePoppedCount = 0L)
+                        }
                         "EXIT_APP", "CLOSE_APP" -> {
                             copy(shouldExitApp = true)
                         }

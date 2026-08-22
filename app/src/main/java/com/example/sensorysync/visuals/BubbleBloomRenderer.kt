@@ -93,6 +93,17 @@ class BubbleBloomRenderer {
     var currentDwellProgress: Float = 0.0f
         private set
 
+    @Volatile
+    private var pendingPopRandom = false
+    @Volatile
+    private var pendingPopAll = false
+    @Volatile
+    private var pendingResetBubbles = false
+
+    fun triggerPopRandom() { pendingPopRandom = true }
+    fun triggerPopAll() { pendingPopAll = true }
+    fun triggerResetBubbles() { pendingResetBubbles = true }
+
     init {
         ensureBubbleCount(12)
     }
@@ -158,8 +169,40 @@ class BubbleBloomRenderer {
 
         val width = drawScope.size.width
         val height = drawScope.size.height
+        val scale = state.bubbleScale.coerceIn(0.5f, 2.0f)
+        val dwellTargetSec = state.bubbleDwellTimeSec.coerceIn(0.5f, 3.0f)
+
+        if (pendingResetBubbles) {
+            pendingResetBubbles = false
+            bubbles.clear()
+        }
 
         ensureBubbleCount(state.bubbleCount)
+
+        if (pendingPopRandom) {
+            pendingPopRandom = false
+            val candidate = bubbles.filter { !it.isPopping }.randomOrNull()
+            if (candidate != null) {
+                candidate.isPopping = true
+                candidate.popProgress = 0f
+                totalPoppedCount++
+                candidate.popRuptureAngle = ((Math.random() - 0.5) * 0.8).toFloat()
+                spawnPopShards(candidate, width, height, scale)
+            }
+        }
+
+        if (pendingPopAll) {
+            pendingPopAll = false
+            for (b in bubbles) {
+                if (!b.isPopping) {
+                    b.isPopping = true
+                    b.popProgress = 0f
+                    totalPoppedCount++
+                    b.popRuptureAngle = ((Math.random() - 0.5) * 0.8).toFloat()
+                    spawnPopShards(b, width, height, scale)
+                }
+            }
+        }
 
         // 1. Render Cosmic Nebula & Starfield
         renderCosmicBackground(drawScope, width, height)
@@ -172,9 +215,6 @@ class BubbleBloomRenderer {
 
         var bestTargetIdx: Int? = null
         var bestDist = Float.MAX_VALUE
-
-        val scale = state.bubbleScale.coerceIn(0.5f, 2.0f)
-        val dwellTargetSec = state.bubbleDwellTimeSec.coerceIn(0.5f, 3.0f)
 
         if (state.gazeData.isFaceDetected) {
             for (i in bubbles.indices) {
