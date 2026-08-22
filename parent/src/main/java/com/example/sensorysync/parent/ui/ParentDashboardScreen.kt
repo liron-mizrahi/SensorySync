@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,17 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sensorysync.parent.mqtt.ParentControlState
 import com.example.sensorysync.parent.mqtt.ParentMqttClient
-
-data class PatternItem(val id: Int, val title: String, val subtitle: String, val color: Color)
-
-val patternList = listOf(
-    PatternItem(1, "Gentle Stars", "Floating particles", Color(0xFF00BCD4)),
-    PatternItem(2, "Breathing Mandala", "Sacred geometry", Color(0xFF9C27B0)),
-    PatternItem(3, "Calming Wave", "Safe pulse wave", Color(0xFF4CAF50)),
-    PatternItem(4, "Liquid Ripples", "Standing waves", Color(0xFF0288D1)),
-    PatternItem(5, "Soft Starfield", "3D horizon drift", Color(0xFF3F51B5)),
-    PatternItem(6, "Swirling Smoke", "Fluid ink & smoke", Color(0xFFFF9800))
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,7 +158,7 @@ fun ParentDashboardScreen(
                 }
             }
 
-            // 2. Tablet Live Status Header Card
+            // 2. Tablet Live Status & Jellyfish Focus Header Card
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -205,13 +193,18 @@ fun ParentDashboardScreen(
                         Badge(
                             containerColor = when {
                                 !isOnline -> Color.Gray
-                                state.engagementScorePercent >= 70 -> Color(0xFF4CAF50)
-                                state.engagementScorePercent >= 40 -> Color(0xFFFF9800)
-                                else -> Color(0xFFE91E63)
+                                state.isGazeFocusingOnJellyfish -> Color(0xFF4CAF50)
+                                state.isGazeDetected -> Color(0xFF00BCD4)
+                                else -> Color(0xFFFF9800)
                             }
                         ) {
                             Text(
-                                text = if (isOnline) "Focus: ${state.engagementScorePercent}%" else "Focus: --",
+                                text = when {
+                                    !isOnline -> "Focus: --"
+                                    state.isGazeFocusingOnJellyfish -> "IN FOCUS ✨"
+                                    state.isGazeDetected -> "LOOKING AROUND"
+                                    else -> "NO GAZE"
+                                },
                                 color = Color.White,
                                 fontSize = 10.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -219,7 +212,7 @@ fun ParentDashboardScreen(
                         }
                     }
 
-                    Text("Active Pattern: ${state.activePatternTitle}", fontSize = 12.sp, color = Color.Gray)
+                    Text("Active Visual: 🪼 Cosmic Jellyfish (Gaze-Contingent Tracking)", fontSize = 12.sp, color = Color(0xFF00BCD4), fontWeight = FontWeight.Medium)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -230,12 +223,12 @@ fun ParentDashboardScreen(
                             Icon(
                                 imageVector = Icons.Default.Visibility,
                                 contentDescription = "Eye Contact",
-                                tint = if (state.isFaceLocked && state.isGazeDetected) Color(0xFF4CAF50) else Color.Gray,
+                                tint = if (state.isFaceLocked && state.isGazeFocusingOnJellyfish) Color(0xFF4CAF50) else Color.Gray,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Child Eye Contact:",
+                                text = "Jellyfish Focus Time:",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -244,7 +237,7 @@ fun ParentDashboardScreen(
                             text = formatDuration(state.activeEyeContactSeconds),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (state.isFaceLocked && state.isGazeDetected) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface
+                            color = if (state.isFaceLocked && state.isGazeFocusingOnJellyfish) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -431,73 +424,9 @@ fun ParentDashboardScreen(
                 }
             }
 
-            // 4. Visual Stimulation Pattern Selector (Compact Grid Cards)
+            // 4. Cosmic Jellyfish Controls & Fine-Tuning
             Text(
-                text = "Select Visual Stimulation Pattern",
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f)
-            )
-
-            Column(
-                modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                patternList.chunked(2).forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        row.forEach { item ->
-                            val isSelected = state.activePatternId == item.id
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(68.dp)
-                                    .clickable(enabled = isOnline) {
-                                        mqttClient.sendCommand(state.topicPrefix, "pattern", item.id.toString())
-                                    },
-                                color = if (isSelected) item.color.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(10.dp),
-                                border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, item.color) else null
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(8.dp),
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = item.title,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = if (isSelected) item.color else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        if (isSelected) {
-                                            Icon(
-                                                imageVector = Icons.Default.CheckCircle,
-                                                contentDescription = "Selected",
-                                                tint = item.color,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        }
-                                    }
-                                    Text(item.subtitle, fontSize = 10.sp, color = Color.Gray)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 5. Fine-Tuning Parameter Controls (Compact Sliders)
-            Text(
-                text = "Visual Controls",
+                text = "🪼 Cosmic Jellyfish Controls",
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f)
@@ -516,7 +445,25 @@ fun ParentDashboardScreen(
                 ) {
                     Column {
                         Text(
-                            text = "Pulse Frequency: ${"%.1f".format(state.strobeFrequencyHz)} Hz (Safe Mode)",
+                            text = "Swimming Speed: ${"%.1f".format(state.speedMultiplier)}x",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Slider(
+                            value = state.speedMultiplier.coerceIn(0.2f, 2.0f),
+                            onValueChange = { spd ->
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "speed", "%.2f".format(spd))
+                                }
+                            },
+                            enabled = isOnline,
+                            valueRange = 0.2f..2.0f
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = "Breathing Pulse Frequency: ${"%.1f".format(state.strobeFrequencyHz)} Hz (Safe Mode)",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -534,7 +481,7 @@ fun ParentDashboardScreen(
 
                     Column {
                         Text(
-                            text = "Color Spectrum Hue: ${state.primaryHue.toInt()}°",
+                            text = "Bioluminescent Hue: ${state.primaryHue.toInt()}°",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -552,7 +499,7 @@ fun ParentDashboardScreen(
                 }
             }
 
-            // 6. Remote Action Buttons (Calibration & Exit)
+            // 5. Remote Action Buttons (Calibration & Exit)
             Text(
                 text = "Parent Actions & Safety",
                 fontWeight = FontWeight.Bold,

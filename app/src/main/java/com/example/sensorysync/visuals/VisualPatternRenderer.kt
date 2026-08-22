@@ -2,6 +2,7 @@ package com.example.sensorysync.visuals
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -9,399 +10,432 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import com.example.sensorysync.model.ControlState
-import com.example.sensorysync.model.VisualPattern
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlin.math.*
 
 class VisualPatternRenderer {
 
-    private class Particle(
+    // Background floating plankton spores
+    private class Spore(
         var x: Float,
         var y: Float,
         var vx: Float,
         var vy: Float,
         var size: Float,
+        var alpha: Float,
         var hueOffset: Float
     )
 
-    private val particles = List(300) {
-        Particle(
-            x = (Math.random()).toFloat(),
-            y = (Math.random()).toFloat(),
-            vx = ((Math.random() - 0.5) * 0.002).toFloat(),
-            vy = ((Math.random() - 0.5) * 0.002).toFloat(),
-            size = (2f + Math.random() * 4f).toFloat(),
-            hueOffset = (Math.random() * 60f).toFloat()
+    // Sparkle particles emitted when the child's gaze focuses on the jellyfish
+    private class Sparkle(
+        var x: Float,
+        var y: Float,
+        var vx: Float,
+        var vy: Float,
+        var life: Float,
+        var maxLife: Float,
+        var size: Float,
+        var color: Color
+    )
+
+    // Jellyfish physics tentacles (6 tentacles, 10 joints each)
+    private val numTentacles = 6
+    private val jointsPerTentacle = 10
+    private val tentacleJoints = Array(numTentacles) { Array(jointsPerTentacle) { Offset(0.5f, 0.5f) } }
+
+    private val spores = List(120) {
+        Spore(
+            x = Math.random().toFloat(),
+            y = Math.random().toFloat(),
+            vx = ((Math.random() - 0.5) * 0.0004).toFloat(),
+            vy = ((Math.random() - 0.5) * 0.0004).toFloat(),
+            size = (1.5f + Math.random() * 3f).toFloat(),
+            alpha = (0.2f + Math.random() * 0.5f).toFloat(),
+            hueOffset = (Math.random() * 50f).toFloat()
         )
     }
+
+    private val sparkles = mutableListOf<Sparkle>()
 
     private var animTime = 0f
 
+    // Jellyfish position and motion dynamics
+    private var jellyX = 0.5f
+    private var jellyY = 0.5f
+    private var jellyHeading = 0f
+    private var targetHeading = 0f
+    private var swimSpeed = 0.0012f
+
+    // Focus state output
+    var latestJellyfishPos = Offset(0.5f, 0.5f)
+        private set
+    var isCurrentlyFocused = false
+        private set
+    var gazeJellyDistance = 1.0f
+        private set
+
     fun render(drawScope: DrawScope, state: ControlState, frameDeltaTime: Float) {
-        animTime += frameDeltaTime * state.speedMultiplier
+        val dt = frameDeltaTime.coerceIn(0.001f, 0.05f)
+        animTime += dt * state.speedMultiplier
 
-        when (state.activePattern) {
-            VisualPattern.HARMONIC_PARTICLES -> renderParticles(drawScope, state)
-            VisualPattern.SACRED_MANDALA -> renderMandala(drawScope, state)
-            VisualPattern.ISOCHRONIC_STROBE -> renderIsochronicStrobe(drawScope, state)
-            VisualPattern.CHLADNI_RIPPLES -> renderChladniRipples(drawScope, state)
-            VisualPattern.WARP_TUNNEL -> renderWarpTunnel(drawScope, state)
-            VisualPattern.SWIRLING_SMOKE -> renderFluidSmoke(drawScope, state)
-        }
-    }
-
-
-    private fun renderParticles(drawScope: DrawScope, state: ControlState) {
         val width = drawScope.size.width
         val height = drawScope.size.height
 
-        // Determine attraction focal points (Gaze, Hands, Touch)
-        val targetPoints = mutableListOf<Offset>()
+        // 1. Update Autonomous Swimming Path (Side to Side Smooth Organic Wandering)
+        updateJellyfishMovement(dt, state.speedMultiplier, state.strobeFrequencyHz)
+
+        val jx = jellyX * width
+        val jy = jellyY * height
+        latestJellyfishPos = Offset(jellyX, jellyY)
+
+        // 2. Gaze Focus Calculation
+        val gazeNormX = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.x else 0.5f
+        val gazeNormY = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.y else 0.5f
+        val gazePx = gazeNormX * width
+        val gazePy = gazeNormY * height
+
+        val dxNorm = (gazeNormX - jellyX)
+        val dyNorm = (gazeNormY - jellyY) * (height / width.coerceAtLeast(1f))
+        gazeJellyDistance = sqrt(dxNorm * dxNorm + dyNorm * dyNorm)
+
+        // Consider focus if gaze is within the jellyfish bell / aura area (radius ~0.16)
+        isCurrentlyFocused = state.gazeData.isFaceDetected && gazeJellyDistance < 0.16f
+
+        // 3. Render Background Floating Plankton Spores
+        renderSpores(drawScope, state, width, height)
+
+        // 4. Render Focus Sparkle Bursts (Reward feedback when looking at jellyfish)
+        if (isCurrentlyFocused) {
+            emitFocusSparkles(jx, jy, state.primaryHue)
+        }
+        renderSparkles(drawScope, dt)
+
+        // 5. Render Bioluminescent Cosmic Jellyfish
+        renderJellyfish(drawScope, state, jx, jy, width, height)
+
+        // 6. Render Real-Time Eye Gaze Tracking Point
         if (state.gazeData.isFaceDetected) {
-            targetPoints.add(Offset(state.gazeData.gazePosition.x * width, state.gazeData.gazePosition.y * height))
+            renderGazeReticle(drawScope, gazePx, gazePy, isCurrentlyFocused, state.primaryHue)
         }
-        if (state.leftHand.isPresent) {
-            targetPoints.add(Offset(state.leftHand.position.x * width, state.leftHand.position.y * height))
-        }
-        if (state.rightHand.isPresent) {
-            targetPoints.add(Offset(state.rightHand.position.x * width, state.rightHand.position.y * height))
-        }
-        state.activeTouchPoints.forEach { touch ->
-            targetPoints.add(touch.position)
-        }
-        if (targetPoints.isEmpty()) {
-            targetPoints.add(Offset(width * 0.5f, height * 0.5f))
+    }
+
+    private fun updateJellyfishMovement(dt: Float, speedMul: Float, pulseFreq: Float) {
+        // Pulse cycle: contraction & glide
+        val freq = pulseFreq.coerceIn(0.2f, 3.0f)
+        val pulsePhase = (animTime * freq * 2.0 * PI)
+        val pulsePower = sin(pulsePhase).toFloat()
+
+        // Organic undulating wander (Perlin-like smooth continuous curves)
+        val wanderAngle = (
+            sin(animTime * 0.35f) * 1.2f +
+            cos(animTime * 0.22f) * 0.9f +
+            sin(animTime * 0.65f) * 0.4f
+        )
+        targetHeading = wanderAngle
+
+        // Smooth heading turn
+        val angleDiff = (targetHeading - jellyHeading)
+        jellyHeading += angleDiff * (dt * 1.5f)
+
+        // Forward thrust during contraction pulse
+        val thrust = if (pulsePower > 0f) (pulsePower * pulsePower * 1.8f) else 0.25f
+        val currentSpeed = swimSpeed * speedMul * (0.4f + thrust)
+
+        // Compute velocity
+        val vx = cos(jellyHeading) * currentSpeed * 1.2f // gentle side-to-side emphasis
+        val vy = (sin(jellyHeading) * currentSpeed * 0.7f) - 0.00015f // subtle natural upward drift
+
+        jellyX += vx
+        jellyY += vy
+
+        // Smooth screen boundary rebound (keep jellyfish swimming naturally within visible canvas)
+        if (jellyX < 0.12f) {
+            jellyX = 0.12f
+            jellyHeading = abs(jellyHeading)
+        } else if (jellyX > 0.88f) {
+            jellyX = 0.88f
+            jellyHeading = PI.toFloat() - abs(jellyHeading)
         }
 
-        // Draw connecting constellation lines & update particles
-        val countToUse = state.particleCount.coerceIn(50, particles.size)
+        if (jellyY < 0.14f) {
+            jellyY = 0.14f
+            jellyHeading = (PI * 0.5).toFloat()
+        } else if (jellyY > 0.82f) {
+            jellyY = 0.82f
+            jellyHeading = -(PI * 0.5).toFloat()
+        }
+    }
+
+    private fun renderSpores(drawScope: DrawScope, state: ControlState, width: Float, height: Float) {
         val baseHue = state.primaryHue
+        for (spore in spores) {
+            spore.x = (spore.x + spore.vx + 1f) % 1f
+            spore.y = (spore.y + spore.vy + 1f) % 1f
 
-        for (i in 0 until countToUse) {
-            val p = particles[i]
+            val sx = spore.x * width
+            val sy = spore.y * height
+            val color = Color.hsv((baseHue + spore.hueOffset) % 360f, 0.6f, 0.9f).copy(alpha = spore.alpha)
 
-            // Gravitate to closest target point
-            var closestDist = Float.MAX_VALUE
-            var targetX = width * 0.5f
-            var targetY = height * 0.5f
+            drawScope.drawCircle(
+                color = color,
+                radius = spore.size,
+                center = Offset(sx, sy)
+            )
+        }
+    }
 
-            val px = p.x * width
-            val py = p.y * height
+    private fun emitFocusSparkles(centerX: Float, centerY: Float, baseHue: Float) {
+        if (sparkles.size > 80) return
+        for (i in 0..2) {
+            val angle = (Math.random() * 2.0 * PI).toFloat()
+            val spd = (30f + Math.random() * 90f).toFloat()
+            val hue = (baseHue + (Math.random() * 80f - 40f).toFloat() + 360f) % 360f
+            sparkles.add(
+                Sparkle(
+                    x = centerX + (Math.random() * 40f - 20f).toFloat(),
+                    y = centerY + (Math.random() * 30f - 15f).toFloat(),
+                    vx = cos(angle) * spd,
+                    vy = sin(angle) * spd,
+                    life = 1.0f,
+                    maxLife = (0.6f + Math.random() * 0.5f).toFloat(),
+                    size = (2.5f + Math.random() * 3.5f).toFloat(),
+                    color = Color.hsv(hue, 0.5f, 1.0f)
+                )
+            )
+        }
+    }
 
-            for (tp in targetPoints) {
-                val dx = tp.x - px
-                val dy = tp.y - py
-                val distSq = dx * dx + dy * dy
-                if (distSq < closestDist) {
-                    closestDist = distSq
-                    targetX = tp.x
-                    targetY = tp.y
-                }
+    private fun renderSparkles(drawScope: DrawScope, dt: Float) {
+        val it = sparkles.iterator()
+        while (it.hasNext()) {
+            val s = it.next()
+            s.life -= dt / s.maxLife
+            if (s.life <= 0f) {
+                it.remove()
+                continue
             }
 
-            // Spring force
-            val fx = (targetX - px) * 0.0003f
-            val fy = (targetY - py) * 0.0003f
+            s.x += s.vx * dt
+            s.y += s.vy * dt
+            s.vy += 15f * dt // gentle gravitational fall
 
-            p.vx = (p.vx + fx) * 0.95f
-            p.vy = (p.vy + fy) * 0.95f
-
-            p.x += p.vx
-            p.y += p.vy
-
-            // Wrap boundaries
-            if (p.x < 0f) p.x = 1f
-            if (p.x > 1f) p.x = 0f
-            if (p.y < 0f) p.y = 1f
-            if (p.y > 1f) p.y = 0f
-
-            val curPx = p.x * width
-            val curPy = p.y * height
-
-            val particleColor = Color.hsv((baseHue + p.hueOffset) % 360f, state.saturation, 0.95f)
-
-            // Draw particle
+            val alpha = (s.life).coerceIn(0f, 1f)
             drawScope.drawCircle(
-                color = particleColor,
-                radius = p.size * (1f + (1f - state.leftHand.pinchDistance) * 2f),
-                center = Offset(curPx, curPy)
+                color = s.color.copy(alpha = alpha),
+                radius = s.size * alpha,
+                center = Offset(s.x, s.y)
+            )
+        }
+    }
+
+    private fun renderJellyfish(
+        drawScope: DrawScope,
+        state: ControlState,
+        centerX: Float,
+        centerY: Float,
+        width: Float,
+        height: Float
+    ) {
+        val baseHue = state.primaryHue
+        val pulsePhase = (animTime * state.strobeFrequencyHz.coerceIn(0.2f, 3.0f) * 2.0 * PI)
+        val pulseVal = ((sin(pulsePhase) + 1.0) / 2.0).toFloat()
+
+        // Contraction/expansion geometry
+        val bellWidth = 85f * (1f + (1f - pulseVal) * 0.35f)
+        val bellHeight = 65f * (1f + pulseVal * 0.35f)
+        val focusGlowBoost = if (isCurrentlyFocused) 0.35f else 0.0f
+
+        val rotationDeg = (jellyHeading * (180f / PI.toFloat()) + 90f)
+
+        drawScope.rotate(degrees = rotationDeg, pivot = Offset(centerX, centerY)) {
+            // A. Radiant Bioluminescent Ambient Aura behind the Jellyfish
+            val auraColor = Color.hsv(baseHue, 0.7f, 0.9f)
+            val auraRadius = bellWidth * (1.6f + focusGlowBoost)
+            drawScope.drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        auraColor.copy(alpha = 0.35f + focusGlowBoost),
+                        auraColor.copy(alpha = 0.12f),
+                        Color.Transparent
+                    ),
+                    center = Offset(centerX, centerY),
+                    radius = auraRadius
+                ),
+                radius = auraRadius,
+                center = Offset(centerX, centerY)
             )
 
-            // Draw constellation lines between nearby particles
-            if (i % 3 == 0) {
-                for (j in (i + 1) until (i + 8).coerceAtMost(countToUse)) {
-                    val p2 = particles[j]
-                    val dx = (p2.x - p.x) * width
-                    val dy = (p2.y - p.y) * height
-                    val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-                    if (dist < 120f) {
-                        val alpha = ((1f - dist / 120f) * 0.4f).coerceIn(0f, 1f)
-                        drawScope.drawLine(
-                            color = particleColor.copy(alpha = alpha),
-                            start = Offset(curPx, curPy),
-                            end = Offset(p2.x * width, p2.y * height),
-                            strokeWidth = 1.5f
-                        )
-                    }
+            // B. Trailing Physics Tentacles (6 Tentacles)
+            val tentacleBaseY = centerY + bellHeight * 0.3f
+            for (t in 0 until numTentacles) {
+                val tOffsetNorm = (t.toFloat() / (numTentacles - 1) - 0.5f) * 2f // -1.0 to 1.0
+                val rootX = centerX + tOffsetNorm * (bellWidth * 0.65f)
+                val rootY = tentacleBaseY
+
+                val tentaclePath = Path()
+                tentaclePath.moveTo(rootX, rootY)
+
+                val joints = tentacleJoints[t]
+                joints[0] = Offset(rootX, rootY)
+
+                val tentacleLength = 140f + abs(tOffsetNorm) * 30f
+                val segmentLen = tentacleLength / jointsPerTentacle
+
+                for (j in 1 until jointsPerTentacle) {
+                    val prevJoint = joints[j - 1]
+                    val wave = sin(animTime * 4f + t * 0.8f + j * 0.6f) * (8f + j * 2.2f)
+                    val dragOffset = (1f - pulseVal) * 6f
+
+                    val targetX = prevJoint.x + wave * 0.35f
+                    val targetY = prevJoint.y + segmentLen + dragOffset
+
+                    // Damped follow
+                    val currentJ = joints[j]
+                    val newX = currentJ.x + (targetX - currentJ.x) * 0.45f
+                    val newY = currentJ.y + (targetY - currentJ.y) * 0.45f
+                    joints[j] = Offset(newX, newY)
+
+                    tentaclePath.lineTo(newX, newY)
                 }
-            }
-        }
-    }
 
-    private fun renderMandala(drawScope: DrawScope, state: ControlState) {
-        val width = drawScope.size.width
-        val height = drawScope.size.height
-        val center = Offset(
-            if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.x * width else width * 0.5f,
-            if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.y * height else height * 0.5f
-        )
-
-        val maxRadius = (width.coerceAtMost(height) * 0.4f)
-        val numLayers = 6
-        val baseHue = state.primaryHue
-
-        // Pinch or two-hand stretch alters scale
-        val scaleFactor = (0.5f + (1f - state.leftHand.pinchDistance) * 1.5f).coerceIn(0.3f, 2.5f)
-
-        for (layer in 1..numLayers) {
-            val radius = (maxRadius * (layer.toFloat() / numLayers)) * scaleFactor
-            val sides = 3 + layer * 2
-            val rotAngle = (animTime * (20f / layer) + layer * 15f) % 360f
-
-            val hue = (baseHue + layer * 25f) % 360f
-            val layerColor = Color.hsv(hue, state.saturation, 0.9f)
-
-            drawScope.rotate(degrees = rotAngle, pivot = center) {
-                val path = Path()
-                for (i in 0 until sides) {
-                    val angle = (2.0 * PI * i / sides)
-                    val x = center.x + (radius * cos(angle)).toFloat()
-                    val y = center.y + (radius * sin(angle)).toFloat()
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-                path.close()
+                val tentacleHue = (baseHue + t * 18f + animTime * 10f) % 360f
+                val tentacleColor = Color.hsv(tentacleHue, 0.7f, 0.95f)
+                val tentacleAlpha = (0.55f + focusGlowBoost).coerceIn(0.2f, 1f)
 
                 drawPath(
-                    path = path,
-                    color = layerColor,
-                    style = Stroke(width = 3f + layer)
+                    path = tentaclePath,
+                    color = tentacleColor.copy(alpha = tentacleAlpha),
+                    style = Stroke(width = if (t in 2..3) 3.5f else 2.2f, cap = StrokeCap.Round)
                 )
+            }
 
-                // Sub-circles at vertices
-                for (i in 0 until sides) {
-                    val angle = (2.0 * PI * i / sides)
-                    val x = center.x + (radius * cos(angle)).toFloat()
-                    val y = center.y + (radius * sin(angle)).toFloat()
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.8f),
-                        radius = 4f + layer,
-                        center = Offset(x, y)
-                    )
+            // C. Inner Lacy Oral Arms (Center Floating Frills)
+            val oralPath = Path()
+            oralPath.moveTo(centerX - bellWidth * 0.25f, tentacleBaseY)
+            for (k in 1..8) {
+                val frillX = centerX + sin(animTime * 5f + k * 0.9f) * (bellWidth * 0.22f)
+                val frillY = tentacleBaseY + k * 14f
+                oralPath.lineTo(frillX, frillY)
+            }
+            drawPath(
+                path = oralPath,
+                color = Color.hsv((baseHue + 40f) % 360f, 0.5f, 1.0f).copy(alpha = 0.65f),
+                style = Stroke(width = 4.5f, cap = StrokeCap.Round)
+            )
+
+            // D. Translucent Bioluminescent Outer Bell (Dome)
+            val bellPath = Path().apply {
+                val topY = centerY - bellHeight * 0.7f
+                val bottomY = centerY + bellHeight * 0.3f
+                val leftX = centerX - bellWidth
+                val rightX = centerX + bellWidth
+
+                moveTo(leftX, bottomY)
+                // Left curve up to crown
+                cubicTo(
+                    leftX * 0.9f + centerX * 0.1f, centerY - bellHeight * 0.4f,
+                    centerX - bellWidth * 0.45f, topY,
+                    centerX, topY
+                )
+                // Right curve down to margin
+                cubicTo(
+                    centerX + bellWidth * 0.45f, topY,
+                    rightX * 0.9f + centerX * 0.1f, centerY - bellHeight * 0.4f,
+                    rightX, bottomY
+                )
+                // Undulating bottom rim frills (Lappet Margin)
+                val scallops = 6
+                for (s in scallops downTo 1) {
+                    val x1 = leftX + (s - 0.5f) * (bellWidth * 2f / scallops)
+                    val y1 = bottomY - 6f * sin((s.toFloat() / scallops) * PI.toFloat() + animTime * 3f)
+                    val x2 = leftX + (s - 1f) * (bellWidth * 2f / scallops)
+                    val y2 = bottomY
+                    quadraticBezierTo(x1, y1, x2, y2)
                 }
+                close()
             }
 
-        }
-    }
+            // Bell fill gradient (Translucent luminous cyan -> deep violet)
+            val bellGradient = Brush.verticalGradient(
+                colors = listOf(
+                    Color.hsv(baseHue, 0.65f, 1.0f).copy(alpha = 0.55f + focusGlowBoost),
+                    Color.hsv((baseHue + 45f) % 360f, 0.75f, 0.95f).copy(alpha = 0.35f + focusGlowBoost * 0.5f),
+                    Color.hsv((baseHue + 90f) % 360f, 0.8f, 0.8f).copy(alpha = 0.2f)
+                ),
+                startY = centerY - bellHeight * 0.7f,
+                endY = centerY + bellHeight * 0.3f
+            )
+            drawPath(path = bellPath, brush = bellGradient)
 
-    private fun renderIsochronicStrobe(drawScope: DrawScope, state: ControlState) {
-        val width = drawScope.size.width
-        val height = drawScope.size.height
+            // Bell outer edge stroke
+            val strokeColor = Color.hsv(baseHue, 0.4f, 1.0f).copy(alpha = 0.85f)
+            drawPath(path = bellPath, color = strokeColor, style = Stroke(width = 2.5f))
 
-        // Enforce Seizure & Epilepsy Safety: Strict 3.0 Hz maximum pulse ceiling
-        val strobeFreq = if (state.isPhotosafetyEnabled) {
-            state.strobeFrequencyHz.coerceIn(0.2f, 3.0f)
-        } else {
-            state.strobeFrequencyHz.coerceIn(0.2f, 5.0f)
-        }
-
-        val strobePhase = (animTime * strobeFreq * 2.0 * PI)
-        val pulseVal = ((sin(strobePhase) + 1.0) / 2.0).toFloat()
-
-        val baseHue = (state.primaryHue + animTime * 4f) % 360f
-        val pulseColor = Color.hsv(baseHue, state.saturation, (0.3f + pulseVal * 0.5f).coerceIn(0f, 1f))
-
-        // Background soft breathing glow (never black flash)
-        drawScope.drawRect(color = pulseColor.copy(alpha = 0.25f))
-
-
-        // Expanding concentric rings from gaze center
-        val focalX = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.x * width else width * 0.5f
-        val focalY = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.y * height else height * 0.5f
-
-        val ringCount = 8
-        val maxR = width.coerceAtLeast(height) * 0.6f
-
-        for (r in 0 until ringCount) {
-            val progress = ((animTime * 0.5f + r.toFloat() / ringCount) % 1.0f)
-            val currentRadius = progress * maxR
-            val alpha = (1f - progress) * pulseVal
-
-            drawScope.drawCircle(
-                color = pulseColor.copy(alpha = alpha.coerceIn(0f, 1f)),
-                radius = currentRadius,
-                center = Offset(focalX, focalY),
-                style = Stroke(width = 6f + progress * 10f)
+            // E. Inner Glowing Organ Nucleus Core
+            val coreRadius = (16f + pulseVal * 6f) * (1f + focusGlowBoost)
+            val coreColor = if (isCurrentlyFocused) Color(0xFFFFD54F) else Color.hsv((baseHue + 20f) % 360f, 0.5f, 1.0f)
+            drawCircle(
+                color = coreColor.copy(alpha = 0.85f),
+                radius = coreRadius,
+                center = Offset(centerX, centerY - bellHeight * 0.15f)
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.95f),
+                radius = coreRadius * 0.5f,
+                center = Offset(centerX, centerY - bellHeight * 0.15f)
             )
         }
     }
 
-    private fun renderChladniRipples(drawScope: DrawScope, state: ControlState) {
-        val width = drawScope.size.width
-        val height = drawScope.size.height
-        val rows = 12
-        val cols = 16
+    private fun renderGazeReticle(
+        drawScope: DrawScope,
+        gazeX: Float,
+        gazeY: Float,
+        isFocused: Boolean,
+        baseHue: Float
+    ) {
+        val reticleColor = if (isFocused) Color(0xFF00E676) else Color.hsv(baseHue, 0.8f, 1.0f)
+        val radius = if (isFocused) 18f else 12f
 
-        val cellW = width / cols
-        val cellH = height / rows
+        // Soft outer glow ring
+        drawScope.drawCircle(
+            color = reticleColor.copy(alpha = if (isFocused) 0.5f else 0.25f),
+            radius = radius + 8f,
+            center = Offset(gazeX, gazeY),
+            style = Stroke(width = 3f)
+        )
 
-        val baseHue = state.primaryHue
-        val handX = if (state.rightHand.isPresent) state.rightHand.position.x else 0.5f
-        val handY = if (state.rightHand.isPresent) state.rightHand.position.y else 0.5f
+        // Center reticle dot
+        drawScope.drawCircle(
+            color = reticleColor.copy(alpha = 0.9f),
+            radius = if (isFocused) 6f else 4f,
+            center = Offset(gazeX, gazeY)
+        )
 
-        val m = (3 + (handX * 5).toInt()).toFloat()
-        val n = (2 + (handY * 5).toInt()).toFloat()
-
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
-                val nx = (c.toFloat() / cols) * PI
-                val ny = (r.toFloat() / rows) * PI
-
-                // Chladni formula: a*sin(n*x)*sin(m*y) + b*sin(m*x)*sin(n*y)
-                val wave = sin(n * nx) * sin(m * ny) + cos(m * nx) * cos(n * ny) + sin(animTime * 3f)
-                val normWave = ((wave + 2.0) / 4.0).toFloat().coerceIn(0f, 1f)
-
-                val color = Color.hsv((baseHue + normWave * 120f) % 360f, state.saturation, normWave)
-
-                val rectX = c * cellW
-                val rectY = r * cellH
-
-                drawScope.drawRect(
-                    color = color.copy(alpha = 0.8f),
-                    topLeft = Offset(rectX + cellW * 0.1f, rectY + cellH * 0.1f),
-                    size = Size(cellW * 0.8f * normWave, cellH * 0.8f * normWave)
-                )
-            }
-        }
-    }
-
-    private fun renderWarpTunnel(drawScope: DrawScope, state: ControlState) {
-        val width = drawScope.size.width
-        val height = drawScope.size.height
-
-        val gazeX = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.x * width else width * 0.5f
-        val gazeY = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.y * height else height * 0.5f
-        val center = Offset(gazeX, gazeY)
-
-        val tunnelRays = 24
-        val baseHue = state.primaryHue
-
-        // Radial lines outward
-        for (i in 0 until tunnelRays) {
-            val angle = (2.0 * PI * i / tunnelRays + animTime * 0.2)
-            val rayLength = width.coerceAtLeast(height)
-
-            val endX = center.x + (rayLength * cos(angle)).toFloat()
-            val endY = center.y + (rayLength * sin(angle)).toFloat()
-
-            val hue = (baseHue + i * (360f / tunnelRays)) % 360f
-
-            drawScope.drawLine(
-                color = Color.hsv(hue, state.saturation, 0.7f).copy(alpha = 0.5f),
-                start = center,
-                end = Offset(endX, endY),
-                strokeWidth = 2f
-            )
-        }
-
-        // Concentric depth rectangles
-        val numDepths = 10
-        val maxR = width.coerceAtLeast(height) * 0.8f
-
-        for (d in 0 until numDepths) {
-            val progress = ((animTime * state.speedMultiplier * 0.8f + d.toFloat() / numDepths) % 1.0f)
-            val depthR = progress * maxR
-            val alpha = progress.coerceIn(0f, 1f)
-
-            val hue = (baseHue + d * 20f) % 360f
-
-            drawScope.drawRect(
-                color = Color.hsv(hue, state.saturation, 0.9f).copy(alpha = alpha),
-                topLeft = Offset(center.x - depthR, center.y - depthR),
-                size = Size(depthR * 2f, depthR * 2f),
-                style = Stroke(width = 2f + progress * 8f)
-            )
-        }
-    }
-
-    private fun renderFluidSmoke(drawScope: DrawScope, state: ControlState) {
-        val width = drawScope.size.width
-        val height = drawScope.size.height
-
-        val gazeX = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.x * width else width * 0.5f
-        val gazeY = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.y * height else height * 0.5f
-
-        val baseHue = state.primaryHue
-        val countToUse = (particles.size * 0.8f).toInt()
-
-        // Render fluid smoke tendrils & swirling ink
-        for (i in 0 until countToUse) {
-            val p = particles[i]
-
-            val px = p.x * width
-            val py = p.y * height
-
-            // Vorticity curling velocity (swirling fluid dynamics)
-            val dx = gazeX - px
-            val dy = gazeY - py
-            val distSq = (dx * dx + dy * dy).coerceAtLeast(100f)
-
-            // Tangential vortex force (perpendicular swirl)
-            val swirlX = -dy / distSq * 15f
-            val swirlY = dx / distSq * 15f
-
-            // Upward thermal buoyancy for smoke + vortex
-            p.vx = (p.vx + swirlX * 0.05f) * 0.96f
-            p.vy = (p.vy + swirlY * 0.05f - 0.0001f) * 0.96f
-
-            p.x += p.vx
-            p.y += p.vy
-
-            // Soft wrap
-            if (p.x < -0.1f) p.x = 1.1f
-            if (p.x > 1.1f) p.x = -0.1f
-            if (p.y < -0.1f) p.y = 1.1f
-            if (p.y > 1.1f) p.y = -0.1f
-
-            val curPx = p.x * width
-            val curPy = p.y * height
-
-            // Color gradient blend (Cyan -> Magenta -> Gold)
-            val hue = (baseHue + (i % 3) * 60f + animTime * 5f) % 360f
-            val alpha = (0.25f + sin(animTime * 2f + i) * 0.15f).coerceIn(0.1f, 0.6f)
-            val fluidColor = Color.hsv(hue, state.saturation, 0.95f).copy(alpha = alpha)
-
-            // Fluid smoke soft plume (layered circles with soft radius)
-            val plumeRadius = p.size * 6f * (1f + (1f - state.leftHand.pinchDistance) * 1.5f)
-
-            drawScope.drawCircle(
-                color = fluidColor,
-                radius = plumeRadius,
-                center = Offset(curPx, curPy)
-            )
-
-            // Wispy tendril lines
-            if (i % 4 == 0) {
-                val nextP = particles[(i + 1) % countToUse]
-                drawScope.drawLine(
-                    color = fluidColor.copy(alpha = alpha * 0.5f),
-                    start = Offset(curPx, curPy),
-                    end = Offset(nextP.x * width, nextP.y * height),
-                    strokeWidth = 3f,
-                    cap = StrokeCap.Round
-                )
-            }
-        }
+        // Crosshair ticks
+        val tickLen = 6f
+        drawScope.drawLine(
+            color = reticleColor.copy(alpha = 0.8f),
+            start = Offset(gazeX - radius - tickLen, gazeY),
+            end = Offset(gazeX - radius + 2f, gazeY),
+            strokeWidth = 2f
+        )
+        drawScope.drawLine(
+            color = reticleColor.copy(alpha = 0.8f),
+            start = Offset(gazeX + radius - 2f, gazeY),
+            end = Offset(gazeX + radius + tickLen, gazeY),
+            strokeWidth = 2f
+        )
+        drawScope.drawLine(
+            color = reticleColor.copy(alpha = 0.8f),
+            start = Offset(gazeX, gazeY - radius - tickLen),
+            end = Offset(gazeX, gazeY - radius + 2f),
+            strokeWidth = 2f
+        )
+        drawScope.drawLine(
+            color = reticleColor.copy(alpha = 0.8f),
+            start = Offset(gazeX, gazeY + radius - 2f),
+            end = Offset(gazeX, gazeY + radius + tickLen),
+            strokeWidth = 2f
+        )
     }
 }
-

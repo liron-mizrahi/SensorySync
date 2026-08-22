@@ -78,7 +78,7 @@ class MqttController(
             when (subTopic) {
                 "pattern" -> {
                     val pId = value.toIntOrNull() ?: 1
-                    val newPattern = VisualPattern.entries.firstOrNull { it.id == pId } ?: VisualPattern.HARMONIC_PARTICLES
+                    val newPattern = VisualPattern.entries.firstOrNull { it.id == pId } ?: VisualPattern.COSMIC_JELLYFISH
                     copy(activePattern = newPattern)
                 }
                 "strobe_freq" -> {
@@ -128,11 +128,12 @@ class MqttController(
                         "EXIT_APP", "CLOSE_APP" -> {
                             copy(shouldExitApp = true)
                         }
-                        "RESET" -> copy(activePattern = VisualPattern.HARMONIC_PARTICLES, strobeFrequencyHz = 0.5f)
+                        "RESET" -> copy(activePattern = VisualPattern.COSMIC_JELLYFISH, strobeFrequencyHz = 0.5f)
                         "STROBE_TOGGLE" -> copy(isStrobeActive = !isStrobeActive)
                         else -> this
                     }
                 }
+
                 else -> this
             }
         }
@@ -161,8 +162,13 @@ class MqttController(
                 put("longestFocusStreakSeconds", state.engagementMetrics.longestFocusStreakSeconds)
                 put("engagementScorePercent", state.engagementMetrics.engagementScorePercent)
                 put("showCameraPreview", state.showCameraPreview)
+                put("isGazeFocusingOnJellyfish", state.isGazeFocusingOnJellyfish)
+                put("gazeJellyfishDistance", state.gazeJellyfishDistance)
+                put("jellyfishX", state.jellyfishPosition.x)
+                put("jellyfishY", state.jellyfishPosition.y)
                 put("timestamp", System.currentTimeMillis())
             }
+
 
 
             val statusTopic = "${state.mqttTopicPrefix}/status"

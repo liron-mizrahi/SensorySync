@@ -55,7 +55,22 @@ fun SensoryScreen(
 
             renderer.render(this, state, deltaTime)
 
-            // Draw Camera Vision Gaze and Hand Overlays if debug mode is enabled
+            val isFocused = renderer.isCurrentlyFocused
+            val jPos = renderer.latestJellyfishPos
+            val dist = renderer.gazeJellyDistance
+
+            if (state.isGazeFocusingOnJellyfish != isFocused ||
+                state.jellyfishPosition != jPos
+            ) {
+                onStateChange {
+                    copy(
+                        isGazeFocusingOnJellyfish = isFocused,
+                        jellyfishPosition = jPos,
+                        gazeJellyfishDistance = dist
+                    )
+                }
+            }
+
             if (state.showDebugOverlay) {
                 val width = size.width
                 val height = size.height

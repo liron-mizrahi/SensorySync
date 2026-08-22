@@ -41,8 +41,13 @@ data class ParentControlState(
     val lockedFaceSnapshotBase64: String? = null,
 
     // Tablet Camera Preview Visibility Toggle (Default: false / hidden)
-    val showChildCameraPreview: Boolean = false
+    val showChildCameraPreview: Boolean = false,
+
+    // Jellyfish Engagement & Tracking
+    val isGazeFocusingOnJellyfish: Boolean = false,
+    val gazeJellyfishDistance: Float = 1.0f
 )
+
 
 
 class ParentMqttClient(
@@ -154,9 +159,12 @@ class ParentMqttClient(
                     sessionDurationSeconds = json.optLong("sessionDurationSeconds", 0L),
                     longestFocusStreakSeconds = json.optLong("longestFocusStreakSeconds", 0L),
                     engagementScorePercent = json.optInt("engagementScorePercent", 0),
-                    showChildCameraPreview = json.optBoolean("showCameraPreview", false)
+                    showChildCameraPreview = json.optBoolean("showCameraPreview", false),
+                    isGazeFocusingOnJellyfish = json.optBoolean("isGazeFocusingOnJellyfish", false),
+                    gazeJellyfishDistance = json.optDouble("gazeJellyfishDistance", 1.0).toFloat()
                 )
             }
+
 
         } catch (_: Exception) {}
     }

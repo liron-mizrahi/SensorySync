@@ -3,12 +3,7 @@ package com.example.sensorysync.model
 import androidx.compose.ui.geometry.Offset
 
 enum class VisualPattern(val id: Int, val title: String, val description: String) {
-    HARMONIC_PARTICLES(1, "Gentle Floating Stars", "Soft glowing particles responding to gaze & hands"),
-    SACRED_MANDALA(2, "Breathing Mandala", "Slow soothing multi-layered mandala geometry"),
-    ISOCHRONIC_STROBE(3, "Calming Pulse Wave", "Soft breathing light entrainment (0.2 - 3.0 Hz max)"),
-    CHLADNI_RIPPLES(4, "Liquid Water Ripples", "Gentle wave interference matrix"),
-    WARP_TUNNEL(5, "Soft Horizon Drift", "Peaceful starfield warp guided by eye gaze"),
-    SWIRLING_SMOKE(6, "Swirling Liquid & Smoke", "Viscous colored fluid ink and smooth smoke tendrils")
+    COSMIC_JELLYFISH(1, "Cosmic Jellyfish", "Bioluminescent swimming jellyfish with gaze-following tracking & focus rewards")
 }
 
 enum class HandGesture {
@@ -73,16 +68,21 @@ data class SessionRecord(
 )
 
 data class ControlState(
-    // Visual Pattern Settings (SAFETY CAPPED: 0.2 Hz to 3.0 Hz MAX)
-    val activePattern: VisualPattern = VisualPattern.HARMONIC_PARTICLES,
+    // Visual Pattern Settings (Focused exclusively on Cosmic Jellyfish)
+    val activePattern: VisualPattern = VisualPattern.COSMIC_JELLYFISH,
     val strobeFrequencyHz: Float = 0.5f,
     val speedMultiplier: Float = 0.6f,
     val particleCount: Int = 200,
-    val primaryHue: Float = 200f,
-    val saturation: Float = 0.7f,
+    val primaryHue: Float = 195f,
+    val saturation: Float = 0.75f,
     val isStrobeActive: Boolean = true,
     val isPhotosafetyEnabled: Boolean = true,
     
+    // Jellyfish State & Gaze Alignment
+    val jellyfishPosition: Offset = Offset(0.5f, 0.5f),
+    val isGazeFocusingOnJellyfish: Boolean = false,
+    val gazeJellyfishDistance: Float = 1.0f,
+
     // Target Face Locking
     val isFaceLocked: Boolean = false,
     val targetFaceTrackingId: Int? = null,

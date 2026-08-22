@@ -56,10 +56,10 @@ class AnalyticsTracker(
     private fun tick() {
         sessionDurationSec++
 
-        val isEyeContact = latestState.isFaceLocked && latestState.gazeData.isFaceDetected
+        val isEyeContact = latestState.isFaceLocked && latestState.gazeData.isFaceDetected && latestState.isGazeFocusingOnJellyfish
         if (isEyeContact) {
-
             activeEyeContactSec++
+
             currentStreakSec++
             if (currentStreakSec > longestStreakSec) {
                 longestStreakSec = currentStreakSec
