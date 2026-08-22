@@ -321,7 +321,7 @@ class VisualPatternRenderer {
         val rimPulse = sin(cycle - 1.50).toFloat()
 
         val minDim = width.coerceAtMost(height)
-        val baseScale = minDim * 0.18f
+        val baseScale = minDim * 0.18f * state.jellyfishScale.coerceIn(0.2f, 2.0f)
 
         val crownSquashY = crownPulse * (baseScale * 0.10f)
         val shoulderBulgeX = (1.0f - crownPulse * 0.15f)

@@ -93,6 +93,10 @@ class MqttController(
                     val spd = value.toFloatOrNull()?.coerceIn(0.1f, 3.0f) ?: speedMultiplier
                     copy(speedMultiplier = spd)
                 }
+                "jellyfish_scale", "size", "jellyfish_size" -> {
+                    val scale = value.toFloatOrNull()?.coerceIn(0.2f, 2.0f) ?: jellyfishScale
+                    copy(jellyfishScale = scale)
+                }
 
                 "camera_preview" -> {
                     val show = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
@@ -162,6 +166,7 @@ class MqttController(
                 put("longestFocusStreakSeconds", state.engagementMetrics.longestFocusStreakSeconds)
                 put("engagementScorePercent", state.engagementMetrics.engagementScorePercent)
                 put("showCameraPreview", state.showCameraPreview)
+                put("jellyfishScale", state.jellyfishScale)
                 put("isGazeFocusingOnJellyfish", state.isGazeFocusingOnJellyfish)
                 put("gazeJellyfishDistance", state.gazeJellyfishDistance)
                 put("jellyfishX", state.jellyfishPosition.x)

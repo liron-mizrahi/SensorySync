@@ -79,6 +79,7 @@ data class ControlState(
     val isPhotosafetyEnabled: Boolean = true,
     
     // Jellyfish State & Gaze Alignment
+    val jellyfishScale: Float = 0.5f,
     val jellyfishPosition: Offset = Offset(0.5f, 0.5f),
     val isGazeFocusingOnJellyfish: Boolean = false,
     val gazeJellyfishDistance: Float = 1.0f,

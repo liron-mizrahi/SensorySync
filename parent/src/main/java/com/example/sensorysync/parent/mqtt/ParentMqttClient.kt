@@ -43,7 +43,8 @@ data class ParentControlState(
     // Tablet Camera Preview Visibility Toggle (Default: false / hidden)
     val showChildCameraPreview: Boolean = false,
 
-    // Jellyfish Engagement & Tracking
+    // Jellyfish Engagement & Tracking & Size
+    val jellyfishScale: Float = 0.5f,
     val isGazeFocusingOnJellyfish: Boolean = false,
     val gazeJellyfishDistance: Float = 1.0f
 )
@@ -160,6 +161,7 @@ class ParentMqttClient(
                     longestFocusStreakSeconds = json.optLong("longestFocusStreakSeconds", 0L),
                     engagementScorePercent = json.optInt("engagementScorePercent", 0),
                     showChildCameraPreview = json.optBoolean("showCameraPreview", false),
+                    jellyfishScale = json.optDouble("jellyfishScale", 0.5).toFloat(),
                     isGazeFocusingOnJellyfish = json.optBoolean("isGazeFocusingOnJellyfish", false),
                     gazeJellyfishDistance = json.optDouble("gazeJellyfishDistance", 1.0).toFloat()
                 )

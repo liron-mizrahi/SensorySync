@@ -445,6 +445,24 @@ fun ParentDashboardScreen(
                 ) {
                     Column {
                         Text(
+                            text = "Jellyfish Size: ${"%.2f".format(state.jellyfishScale)}x (${(state.jellyfishScale * 100).toInt()}%)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Slider(
+                            value = state.jellyfishScale.coerceIn(0.2f, 2.0f),
+                            onValueChange = { size ->
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "jellyfish_scale", "%.2f".format(size))
+                                }
+                            },
+                            enabled = isOnline,
+                            valueRange = 0.2f..2.0f
+                        )
+                    }
+
+                    Column {
+                        Text(
                             text = "Swimming Speed: ${"%.1f".format(state.speedMultiplier)}x",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
