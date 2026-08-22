@@ -116,8 +116,8 @@ class VisualPatternRenderer {
         }
         renderSparkles(drawScope, dt)
 
-        // 5. Render Photorealistic Bioluminescent Jellyfish (Matching Reference Image)
-        renderPhotorealisticJellyfish(drawScope, state, jx, jy, width, height)
+        // 5. Render Fluid Hydrodynamic Jellyfish with Peristaltic Wave Mechanics
+        renderFluidHydrodynamicJellyfish(drawScope, state, jx, jy, width, height)
 
         // 6. Render Foreground Floating Bokeh Orbs
         renderForegroundBokeh(drawScope, width, height)
@@ -133,7 +133,6 @@ class VisualPatternRenderer {
         val pulsePhase = (animTime * freq * 2.0 * PI)
         val pulsePower = ((sin(pulsePhase) + 1.0) / 2.0).toFloat()
 
-        // Off-screen detection and smooth re-entry (< 3s)
         val isOffScreen = jellyX < -0.22f || jellyX > 1.22f || jellyY < -0.22f || jellyY > 1.22f
 
         if (isOffScreen) {
@@ -146,7 +145,6 @@ class VisualPatternRenderer {
             timeOffScreenSec = 0f
         }
 
-        // Gentle organic path undulation: strictly capped to small angle turns <= 20 deg
         val baseWanderDelta = (sin(animTime * 0.20f) * 0.12f + cos(animTime * 0.14f) * 0.08f)
         val desiredAngle = targetHeading + baseWanderDelta
 
@@ -159,8 +157,7 @@ class VisualPatternRenderer {
         val clampedTurn = angleDiff.coerceIn(-maxStep, maxStep)
         jellyHeading += clampedTurn
 
-        // Smooth forward propulsion with pulse power stroke
-        val thrust = if (pulsePower > 0.35f) ((pulsePower - 0.35f) * 1.5f) else 0.15f
+        val thrust = if (pulsePower > 0.35f) ((pulsePower - 0.35f) * 1.6f) else 0.12f
         val currentSpeed = swimBaseSpeed * speedMul * (0.5f + thrust)
 
         val desiredVx = cos(jellyHeading) * currentSpeed * 1.25f
@@ -173,7 +170,7 @@ class VisualPatternRenderer {
         jellyX += jellyVx
         jellyY += jellyVy
 
-        val targetTilt = (clampedTurn / maxStep.coerceAtLeast(0.001f)) * 5.0f
+        val targetTilt = (clampedTurn / maxStep.coerceAtLeast(0.001f)) * 6.0f
         jellyTiltZ += (targetTilt - jellyTiltZ) * (2.0f * dt)
     }
 
@@ -220,7 +217,6 @@ class VisualPatternRenderer {
     }
 
     private fun renderAtmosphericBackground(drawScope: DrawScope, width: Float, height: Float) {
-        // Deep oceanic background particles
         for (p in bokehParticles) {
             if (p.isForegroundBokeh) continue
             p.x = (p.x + p.vx + 1f) % 1f
@@ -239,7 +235,6 @@ class VisualPatternRenderer {
     }
 
     private fun renderForegroundBokeh(drawScope: DrawScope, width: Float, height: Float) {
-        // Soft, out-of-focus foreground bokeh orbs
         for (p in bokehParticles) {
             if (!p.isForegroundBokeh) continue
             p.x = (p.x + p.vx * 1.5f + 1f) % 1f
@@ -310,7 +305,7 @@ class VisualPatternRenderer {
         }
     }
 
-    private fun renderPhotorealisticJellyfish(
+    private fun renderFluidHydrodynamicJellyfish(
         drawScope: DrawScope,
         state: ControlState,
         centerX: Float,
@@ -318,24 +313,44 @@ class VisualPatternRenderer {
         width: Float,
         height: Float
     ) {
-        val pulsePhase = (animTime * state.strobeFrequencyHz.coerceIn(0.2f, 3.0f) * 2.0 * PI)
-        val pulseVal = ((sin(pulsePhase) + 1.0) / 2.0).toFloat()
+        val freq = state.strobeFrequencyHz.coerceIn(0.2f, 3.0f)
+        val cycle = animTime * freq * 2.0 * PI
+
+        // 1. Biomechanical Peristaltic Wave Parameters (Apex contracts first, wave travels to rim)
+        val crownPulse = sin(cycle).toFloat() // Crown contraction/expansion
+        val flankPulse = sin(cycle - 0.75).toFloat() // Mid-flank contraction lag
+        val rimPulse = sin(cycle - 1.50).toFloat() // Skirt / lappet rim contraction lag
 
         val minDim = width.coerceAtMost(height)
         val baseScale = minDim * 0.18f
 
-        val bellRadiusX = baseScale * (1f + (1f - pulseVal) * 0.18f)
-        val bellRadiusY = baseScale * 0.92f * (1f + pulseVal * 0.18f)
-        val rimRy = bellRadiusY * 0.28f
+        // Dynamic fluid dimensions with peristaltic wave bulge
+        val crownSquashY = crownPulse * (baseScale * 0.10f) // Crown pushes down/forward
+        val shoulderBulgeX = (1.0f - crownPulse * 0.15f) // Shoulder expands during thrust
+        val flankBulgeX = (1.0f - flankPulse * 0.22f) // Flank wave travels
+        val rimExpansionX = (1.0f - rimPulse * 0.28f) // Rim flares then snaps inward into jet cone
+
+        val bellRadiusX = baseScale * 1.05f
+        val bellHeight = baseScale * 0.95f
+        val rimRy = bellHeight * (0.24f + rimPulse * 0.06f)
         val focusGlowBoost = if (isCurrentlyFocused) 0.45f else 0.0f
 
         val rotationDeg = (jellyHeading * (180f / PI.toFloat()) + 90f) + jellyTiltZ
 
         drawScope.rotate(degrees = rotationDeg, pivot = Offset(centerX, centerY)) {
-            val topApexY = centerY - bellRadiusY * 0.95f
-            val rimBaseY = centerY + bellRadiusY * 0.20f
+            val topApexY = centerY - bellHeight * 0.90f + crownSquashY
+            val rimBaseY = centerY + bellHeight * 0.18f
 
-            // A. Atmospheric Cyan Volumetric Halo (Soft photographic bloom)
+            // Key Hydrodynamic Profile Control Points
+            val apexPt = Offset(centerX, topApexY)
+            val leftShoulder = Offset(centerX - bellRadiusX * 0.65f * shoulderBulgeX, centerY - bellHeight * 0.55f)
+            val rightShoulder = Offset(centerX + bellRadiusX * 0.65f * shoulderBulgeX, centerY - bellHeight * 0.55f)
+            val leftFlank = Offset(centerX - bellRadiusX * 0.95f * flankBulgeX, centerY - bellHeight * 0.15f)
+            val rightFlank = Offset(centerX + bellRadiusX * 0.95f * flankBulgeX, centerY - bellHeight * 0.15f)
+            val leftSkirt = Offset(centerX - bellRadiusX * rimExpansionX, rimBaseY)
+            val rightSkirt = Offset(centerX + bellRadiusX * rimExpansionX, rimBaseY)
+
+            // A. Atmospheric Cyan Volumetric Halo (Bioluminescent Bloom)
             val haloRadius = bellRadiusX * (2.4f + focusGlowBoost)
             drawScope.drawCircle(
                 brush = Brush.radialGradient(
@@ -344,29 +359,29 @@ class VisualPatternRenderer {
                         Color(0xFF0097A7).copy(alpha = 0.18f),
                         Color.Transparent
                     ),
-                    center = Offset(centerX, centerY - bellRadiusY * 0.18f),
+                    center = Offset(centerX, centerY - bellHeight * 0.18f),
                     radius = haloRadius
                 ),
                 radius = haloRadius,
-                center = Offset(centerX, centerY - bellRadiusY * 0.18f)
+                center = Offset(centerX, centerY - bellHeight * 0.18f)
             )
 
             // B. BACK LAYER GOSSAMER FILAMENTS (Depth z < 0)
-            renderGossamerTentacles(drawScope, centerX, rimBaseY, bellRadiusX, rimRy, baseScale, pulseVal, focusGlowBoost, isFront = false)
+            renderGossamerTentacles(drawScope, centerX, rimBaseY, bellRadiusX * rimExpansionX, rimRy, baseScale, rimPulse, focusGlowBoost, isFront = false)
 
-            // C. 3D Subumbrella Interior Cavern with Rose/Violet Luminescence
+            // C. 3D Subumbrella Interior Cavern with Dynamic Fluid Volume
             val cavityPath = Path().apply {
-                val rimRx = bellRadiusX * 0.92f
+                val rimRx = bellRadiusX * rimExpansionX * 0.92f
                 moveTo(centerX - rimRx, rimBaseY)
                 cubicTo(
-                    centerX - rimRx, rimBaseY - rimRy * 2.4f,
-                    centerX + rimRx, rimBaseY - rimRy * 2.4f,
+                    centerX - rimRx * 0.95f, rimBaseY - rimRy * 2.5f - flankPulse * 10f,
+                    centerX + rimRx * 0.95f, rimBaseY - rimRy * 2.5f - flankPulse * 10f,
                     centerX + rimRx, rimBaseY
                 )
-                // 3D elliptical under-margin
+                // 3D undulating elliptical under-margin with water drag
                 cubicTo(
-                    centerX + rimRx * 0.5f, rimBaseY + rimRy * 1.1f,
-                    centerX - rimRx * 0.5f, rimBaseY + rimRy * 1.1f,
+                    centerX + rimRx * 0.5f, rimBaseY + rimRy * 1.1f + sin(animTime * 3.5f) * 4f,
+                    centerX - rimRx * 0.5f, rimBaseY + rimRy * 1.1f + sin(animTime * 3.5f + PI.toFloat()) * 4f,
                     centerX - rimRx, rimBaseY
                 )
                 close()
@@ -375,18 +390,18 @@ class VisualPatternRenderer {
                 path = cavityPath,
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFFE91E63).copy(alpha = 0.70f), // Luminous Magenta Interior
+                        Color(0xFFE91E63).copy(alpha = 0.70f),
                         Color(0xFF880E4F).copy(alpha = 0.48f),
                         Color.Transparent
                     ),
-                    center = Offset(centerX, rimBaseY - bellRadiusY * 0.22f),
+                    center = Offset(centerX, rimBaseY - bellHeight * 0.22f),
                     radius = bellRadiusX * 0.95f
                 )
             )
 
-            // D. 4 Luminous Horseshoe Gonad Organs (Matching Reference Visual)
-            val gonadRadius = (baseScale * 0.32f + pulseVal * 8f) * (1f + focusGlowBoost * 0.35f)
-            val gonadCenter = Offset(centerX, centerY - bellRadiusY * 0.26f)
+            // D. 4 Luminous Horseshoe Gonad Organs (Fluidly Pulsing in Cavity)
+            val gonadRadius = (baseScale * 0.32f + (1f - flankPulse) * 7f) * (1f + focusGlowBoost * 0.35f)
+            val gonadCenter = Offset(centerX, centerY - bellHeight * 0.24f + crownSquashY * 0.5f)
             for (i in 0 until 4) {
                 val ang = (i * PI * 0.5 + animTime * 0.25).toFloat()
                 val ox = gonadCenter.x + cos(ang) * (gonadRadius * 0.65f)
@@ -407,38 +422,58 @@ class VisualPatternRenderer {
                 )
             }
 
-            // E. Cascading Ruffled Chiffon Silk Oral Arms (Flowing Cloth with Highlights)
-            renderRuffledChiffonOralArms(drawScope, centerX, rimBaseY, bellRadiusX, baseScale, pulseVal, focusGlowBoost)
+            // E. Cascading Ruffled Chiffon Silk Oral Arms
+            renderRuffledChiffonOralArms(drawScope, centerX, rimBaseY, bellRadiusX * rimExpansionX, baseScale, rimPulse, focusGlowBoost)
 
-            // F. Translucent 3D Parabolic Glass Bell (Soft Photographic Dome, No Hard Stroke)
-            val outerCapPath = Path().apply {
-                val leftX = centerX - bellRadiusX
-                val rightX = centerX + bellRadiusX
-                val bottomY = rimBaseY
+            // F. Fluid 18-Point Hydrodynamic Bell Surface (Multi-Segment Peristaltic Spline)
+            val fluidBellPath = Path().apply {
+                moveTo(leftSkirt.x, leftSkirt.y)
 
-                moveTo(leftX, bottomY)
-                // Left dome curve up to crown
+                // Left flank: Skirt -> Mid Flank -> Shoulder -> Apex
                 cubicTo(
-                    leftX * 0.94f + centerX * 0.06f, centerY - bellRadiusY * 0.58f,
-                    centerX - bellRadiusX * 0.55f, topApexY,
-                    centerX, topApexY
+                    leftFlank.x * 1.02f, leftFlank.y + bellHeight * 0.12f,
+                    leftFlank.x, leftFlank.y,
+                    leftShoulder.x, leftShoulder.y
                 )
-                // Right dome curve down to margin
                 cubicTo(
-                    centerX + bellRadiusX * 0.55f, topApexY,
-                    rightX * 0.94f + centerX * 0.06f, centerY - bellRadiusY * 0.58f,
-                    rightX, bottomY
+                    leftShoulder.x + bellRadiusX * 0.15f, leftShoulder.y - bellHeight * 0.18f,
+                    apexPt.x - bellRadiusX * 0.35f, apexPt.y,
+                    apexPt.x, apexPt.y
                 )
-                // 3D Elliptical lower rim
+
+                // Right flank: Apex -> Shoulder -> Mid Flank -> Skirt
                 cubicTo(
-                    centerX + bellRadiusX * 0.5f, bottomY + rimRy * 1.1f,
-                    centerX - bellRadiusX * 0.5f, bottomY + rimRy * 1.1f,
-                    leftX, bottomY
+                    apexPt.x + bellRadiusX * 0.35f, apexPt.y,
+                    rightShoulder.x - bellRadiusX * 0.15f, rightShoulder.y - bellHeight * 0.18f,
+                    rightShoulder.x, rightShoulder.y
                 )
+                cubicTo(
+                    rightFlank.x, rightFlank.y,
+                    rightFlank.x * 1.02f, rightFlank.y + bellHeight * 0.12f,
+                    rightSkirt.x, rightSkirt.y
+                )
+
+                // 3D Undulating Elliptical Margin with 16 Flexible Lappet Ripples
+                val numLappets = 16
+                val rimW = (rightSkirt.x - leftSkirt.x)
+                for (lp in numLappets downTo 1) {
+                    val u = lp.toFloat() / numLappets
+                    val nextU = (lp - 1).toFloat() / numLappets
+                    val ang = u * PI.toFloat()
+                    val nextAng = nextU * PI.toFloat()
+
+                    val x1 = leftSkirt.x + u * rimW
+                    val y1 = rimBaseY + sin(ang) * rimRy + sin(animTime * 4.5f + u * 12.0f) * (4.5f * (1f - rimPulse))
+
+                    val x2 = leftSkirt.x + nextU * rimW
+                    val y2 = rimBaseY + sin(nextAng) * rimRy
+
+                    quadraticTo(x1, y1, x2, y2)
+                }
                 close()
             }
 
-            // Layer 1: Base Translucent Glass Dome with Cyan Luminescence & Lavender/Rose Subsurface Tint
+            // Layer 1: Fluid Translucent Glass Gradient (Cyan Crown -> Rose Subsurface)
             val capGradient = Brush.radialGradient(
                 colors = listOf(
                     Color(0xFFE0F7FA).copy(alpha = 0.92f + focusGlowBoost * 0.08f), // Apex Specular Crown
@@ -447,34 +482,36 @@ class VisualPatternRenderer {
                     Color(0xFFF48FB1).copy(alpha = 0.42f), // Rose Subsurface Tint
                     Color(0xFFCE93D8).copy(alpha = 0.28f)  // Lavender Edge
                 ),
-                center = Offset(centerX, topApexY + bellRadiusY * 0.28f),
-                radius = bellRadiusX * 1.18f
+                center = Offset(centerX, topApexY + bellHeight * 0.28f),
+                radius = bellRadiusX * 1.25f
             )
-            drawScope.drawPath(path = outerCapPath, brush = capGradient)
+            drawScope.drawPath(path = fluidBellPath, brush = capGradient)
 
-            // Layer 2: Soft Photographic Edge Bloom (Multi-pass feathered edge instead of hard stroke)
+            // Layer 2: Soft Photographic Feathered Edge Bloom
             drawScope.drawPath(
-                path = outerCapPath,
+                path = fluidBellPath,
                 color = Color(0xFF00E5FF).copy(alpha = 0.45f + focusGlowBoost * 0.2f),
                 style = Stroke(width = 4.0f)
             )
             drawScope.drawPath(
-                path = outerCapPath,
+                path = fluidBellPath,
                 color = Color(0xFFE0F7FA).copy(alpha = 0.85f),
                 style = Stroke(width = 1.4f)
             )
 
-            // G. 24 Fine 3D Radial Parachute Meridians (Curved Neural Striations)
+            // G. 24 Radial Meridians (Dynamically Tracking the Fluid Spline Mesh)
             val numMeridians = 24
             for (m in 0..numMeridians) {
                 val u = (m.toFloat() / numMeridians - 0.5f) * 2f // -1.0 to 1.0
-                val meridianX = centerX + u * (bellRadiusX * 0.92f)
+                val meridianFlankX = centerX + u * (bellRadiusX * 0.92f * (1.0f - flankPulse * 0.18f))
+                val meridianSkirtX = centerX + u * (bellRadiusX * rimExpansionX * 0.90f)
+
                 val ribPath = Path().apply {
                     moveTo(centerX, topApexY + 2f)
                     cubicTo(
-                        centerX * 0.28f + meridianX * 0.72f, topApexY + bellRadiusY * 0.35f,
-                        meridianX, centerY - bellRadiusY * 0.1f,
-                        meridianX, rimBaseY + (1f - u * u) * (rimRy * 0.55f)
+                        centerX * 0.25f + meridianFlankX * 0.75f, topApexY + bellHeight * 0.35f,
+                        meridianFlankX, centerY - bellHeight * 0.1f,
+                        meridianSkirtX, rimBaseY + (1f - u * u) * (rimRy * 0.60f)
                     )
                 }
                 val ribAlpha = (1f - abs(u) * 0.4f) * (0.45f + focusGlowBoost * 0.3f)
@@ -486,7 +523,7 @@ class VisualPatternRenderer {
             }
 
             // H. FOREGROUND LAYER GOSSAMER FILAMENTS (Depth z > 0)
-            renderGossamerTentacles(drawScope, centerX, rimBaseY, bellRadiusX, rimRy, baseScale, pulseVal, focusGlowBoost, isFront = true)
+            renderGossamerTentacles(drawScope, centerX, rimBaseY, bellRadiusX * rimExpansionX, rimRy, baseScale, rimPulse, focusGlowBoost, isFront = true)
         }
     }
 
@@ -528,7 +565,6 @@ class VisualPatternRenderer {
             for (s in 1..segments) {
                 val pt = centerSpine[s]
                 val progress = s.toFloat() / segments
-                // Multi-octave organic frill noise
                 val ruff = sin(animTime * 5.0f + s * 0.9f + a) * 7.5f + cos(animTime * 8.0f + s * 1.8f) * 3.5f
                 val w = (ribbonWidth * (1f - progress * 0.65f) + ruff).coerceAtLeast(3.5f)
 
@@ -548,14 +584,12 @@ class VisualPatternRenderer {
                 close()
             }
 
-            // Layer 1: Semi-transparent Chiffon Fill (Soft Lavender/Rose)
             val silkColor = if (a == 1) Color(0xFFF48FB1) else Color(0xFFCE93D8)
             drawScope.drawPath(
                 path = closedRibbon,
                 color = silkColor.copy(alpha = (0.32f + focusGlowBoost * 0.2f).coerceIn(0.1f, 0.75f))
             )
 
-            // Layer 2: Glowing Ruffled Frill Edges (Cyan & Rose)
             drawScope.drawPath(
                 path = leftRibbonPath,
                 color = Color(0xFF80DEEA).copy(alpha = 0.80f + focusGlowBoost * 0.2f),
@@ -576,7 +610,7 @@ class VisualPatternRenderer {
         bellRadiusX: Float,
         rimRy: Float,
         baseScale: Float,
-        pulseVal: Float,
+        rimPulse: Float,
         focusGlowBoost: Float,
         isFront: Boolean
     ) {
@@ -591,7 +625,6 @@ class VisualPatternRenderer {
             val rootY = rimBaseY + (sin(angleOnRim) * rimRy).toFloat()
 
             val joints = tentacleJoints[t]
-            // Varied organic lengths (matching reference where tentacles trail in clusters)
             val lengthFactor = 2.8f + ((t * 7) % 13) * 0.15f
             val tentacleLength = baseScale * lengthFactor
             val segmentLen = tentacleLength / jointsPerTentacle
@@ -610,19 +643,16 @@ class VisualPatternRenderer {
 
             for (j in 1 until jointsPerTentacle) {
                 val prevJoint = joints[j - 1]
-                val jFrac = j.toFloat() / jointsPerTentacle
 
-                // Multi-octave wave eddies
                 val wave1 = sin(animTime * 3.2f + t * 0.25f + j * 0.32f) * (4.5f + j * 2.4f)
                 val wave2 = cos(animTime * 1.8f + t * 0.55f + j * 0.45f) * (3.0f + j * 1.6f)
 
-                // Organic Tip Curls & Eddies (sweeping swirls near the tail)
                 val tipCurlX = if (j > 16) cos(animTime * 2.2f + t * 0.8f) * (j - 16) * 2.2f else 0f
                 val tipCurlY = if (j > 16) -sin(animTime * 2.2f + t * 0.8f) * (j - 16) * 1.8f else 0f
 
-                val waveAmplitude = (1f + (1f - pulseVal) * 0.35f)
+                val waveAmplitude = (1f + (1f - rimPulse) * 0.35f)
                 val waveX = (wave1 + wave2 + tipCurlX) * waveAmplitude
-                val dragY = segmentLen + (1f - pulseVal) * 3.6f + tipCurlY
+                val dragY = segmentLen + (1f - rimPulse) * 3.6f + tipCurlY
 
                 val targetX = prevJoint.x + waveX * 0.28f
                 val targetY = prevJoint.y + dragY
@@ -635,7 +665,6 @@ class VisualPatternRenderer {
                 tentaclePath.lineTo(newX, newY)
             }
 
-            // Dual-tone color matching reference: Outer Cyan vs Inner Rose/Violet
             val isPinkFilament = (t % 3 == 0)
             val baseColor = if (isPinkFilament) Color(0xFFFF4081) else Color(0xFF00E5FF)
             val baseAlpha = if (isFront) (0.78f + focusGlowBoost * 0.2f) else (0.28f + focusGlowBoost * 0.15f)
@@ -646,7 +675,6 @@ class VisualPatternRenderer {
                 style = Stroke(width = if (isFront) 1.4f else 0.9f, cap = StrokeCap.Round)
             )
 
-            // Gossamer traveling light bead
             if (t % 2 == 0) {
                 val beadJointIdx = ((animTime * 6f + t * 2) % jointsPerTentacle).toInt().coerceIn(1, jointsPerTentacle - 1)
                 val beadPos = joints[beadJointIdx]
