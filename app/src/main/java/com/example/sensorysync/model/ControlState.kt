@@ -111,9 +111,13 @@ data class ControlState(
     val engagementMetrics: EngagementMetrics = EngagementMetrics(),
     val activeTouchPoints: List<TouchPoint> = emptyList(),
     
-    // UI Overlay state
+    // UI Overlay & Gaze Marker state
     val showCameraPreview: Boolean = false,
     val showDebugOverlay: Boolean = false,
+    val showGazeMarker: Boolean = true,
+    val gazeMarkerSize: Float = 1.0f,
+    val gazeMarkerOpacity: Float = 0.8f,
+    val gazeMarkerColor: String = "CYAN",
     
     // MQTT Settings
     val mqttBroker: String = "192.168.1.96",

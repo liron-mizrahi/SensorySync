@@ -54,7 +54,13 @@ data class ParentControlState(
     val bubbleDwellTimeSec: Float = 1.2f,
     val bubblePoppedCount: Long = 0L,
     val focusedBubbleIndex: Int = -1,
-    val bubbleDwellProgress: Float = 0.0f
+    val bubbleDwellProgress: Float = 0.0f,
+
+    // Eye Gaze Marker Display Controls
+    val showGazeMarker: Boolean = true,
+    val gazeMarkerSize: Float = 1.0f,
+    val gazeMarkerOpacity: Float = 0.8f,
+    val gazeMarkerColor: String = "CYAN"
 )
 
 
@@ -169,6 +175,10 @@ class ParentMqttClient(
                     longestFocusStreakSeconds = json.optLong("longestFocusStreakSeconds", 0L),
                     engagementScorePercent = json.optInt("engagementScorePercent", 0),
                     showChildCameraPreview = json.optBoolean("showCameraPreview", false),
+                    showGazeMarker = json.optBoolean("showGazeMarker", true),
+                    gazeMarkerSize = json.optDouble("gazeMarkerSize", 1.0).toFloat(),
+                    gazeMarkerOpacity = json.optDouble("gazeMarkerOpacity", 0.8).toFloat(),
+                    gazeMarkerColor = json.optString("gazeMarkerColor", "CYAN"),
                     jellyfishScale = json.optDouble("jellyfishScale", 0.5).toFloat(),
                     bubbleCount = json.optInt("bubbleCount", 12),
                     bubbleScale = json.optDouble("bubbleScale", 1.0).toFloat(),

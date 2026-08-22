@@ -110,6 +110,22 @@ class MqttController(
                     copy(bubbleDwellTimeSec = dwell)
                 }
 
+                "gaze_marker", "show_gaze_marker", "gaze_overlay" -> {
+                    val show = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
+                    copy(showGazeMarker = show)
+                }
+                "gaze_marker_size", "marker_size" -> {
+                    val size = value.toFloatOrNull()?.coerceIn(0.5f, 3.0f) ?: gazeMarkerSize
+                    copy(gazeMarkerSize = size)
+                }
+                "gaze_marker_opacity", "marker_opacity" -> {
+                    val opacity = value.toFloatOrNull()?.coerceIn(0.1f, 1.0f) ?: gazeMarkerOpacity
+                    copy(gazeMarkerOpacity = opacity)
+                }
+                "gaze_marker_color", "marker_color" -> {
+                    copy(gazeMarkerColor = value.uppercase())
+                }
+
                 "camera_preview" -> {
                     val show = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
                     copy(showCameraPreview = show)
@@ -190,6 +206,10 @@ class MqttController(
                 put("longestFocusStreakSeconds", state.engagementMetrics.longestFocusStreakSeconds)
                 put("engagementScorePercent", state.engagementMetrics.engagementScorePercent)
                 put("showCameraPreview", state.showCameraPreview)
+                put("showGazeMarker", state.showGazeMarker)
+                put("gazeMarkerSize", state.gazeMarkerSize)
+                put("gazeMarkerOpacity", state.gazeMarkerOpacity)
+                put("gazeMarkerColor", state.gazeMarkerColor)
                 put("jellyfishScale", state.jellyfishScale)
                 put("bubbleCount", state.bubbleCount)
                 put("bubbleScale", state.bubbleScale)

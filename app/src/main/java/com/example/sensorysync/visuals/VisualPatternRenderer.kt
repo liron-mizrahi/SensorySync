@@ -123,8 +123,8 @@ class VisualPatternRenderer {
         renderForegroundBokeh(drawScope, width, height)
 
         // 7. Render Real-Time Eye Gaze Tracking Point (Scaled to 0.3x)
-        if (state.gazeData.isFaceDetected) {
-            renderGazeReticleSmall(drawScope, gazePx, gazePy, isCurrentlyFocused)
+        if (state.gazeData.isFaceDetected && state.showGazeMarker) {
+            renderGazeReticleSmall(drawScope, state, gazePx, gazePy, isCurrentlyFocused)
         }
     }
 
@@ -706,50 +706,67 @@ class VisualPatternRenderer {
 
     private fun renderGazeReticleSmall(
         drawScope: DrawScope,
+        state: ControlState,
         gazeX: Float,
         gazeY: Float,
         isFocused: Boolean
     ) {
-        val reticleColor = if (isFocused) Color(0xFF00E676) else Color(0xFF00E5FF)
-        val radius = if (isFocused) 6.5f else 4.2f
+        if (!state.showGazeMarker) return
+
+        val markerScale = state.gazeMarkerSize.coerceIn(0.5f, 3.0f)
+        val markerOpacity = state.gazeMarkerOpacity.coerceIn(0.1f, 1.0f)
+
+        val baseColor = when (state.gazeMarkerColor.uppercase()) {
+            "GREEN" -> Color(0xFF00E676)
+            "MAGENTA", "PINK" -> Color(0xFFE040FB)
+            "GOLD", "YELLOW" -> Color(0xFFFFD54F)
+            "WHITE" -> Color.White
+            else -> Color(0xFF00E5FF) // CYAN
+        }
+
+        val reticleColor = if (isFocused) Color(0xFF00E676) else baseColor
+        val radius = (if (isFocused) 6.5f else 4.2f) * markerScale
 
         drawScope.drawCircle(
-            color = reticleColor.copy(alpha = if (isFocused) 0.65f else 0.30f),
-            radius = radius + 3.0f,
+            color = reticleColor.copy(alpha = (if (isFocused) 0.65f else 0.35f) * markerOpacity),
+            radius = radius + (3.0f * markerScale),
             center = Offset(gazeX, gazeY),
-            style = Stroke(width = 1.0f)
+            style = Stroke(width = 1.0f * markerScale)
         )
 
         drawScope.drawCircle(
-            color = reticleColor.copy(alpha = 0.98f),
-            radius = if (isFocused) 2.0f else 1.3f,
+            color = reticleColor.copy(alpha = 0.98f * markerOpacity),
+            radius = (if (isFocused) 2.0f else 1.3f) * markerScale,
             center = Offset(gazeX, gazeY)
         )
 
-        val tickLen = 2.5f
+        val tickLen = 2.5f * markerScale
+        val strokeW = 1.0f * markerScale
+        val tickAlpha = 0.85f * markerOpacity
+
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = 0.85f),
+            color = reticleColor.copy(alpha = tickAlpha),
             start = Offset(gazeX - radius - tickLen, gazeY),
-            end = Offset(gazeX - radius + 1f, gazeY),
-            strokeWidth = 1.0f
+            end = Offset(gazeX - radius + (1f * markerScale), gazeY),
+            strokeWidth = strokeW
         )
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = 0.85f),
-            start = Offset(gazeX + radius - 1f, gazeY),
+            color = reticleColor.copy(alpha = tickAlpha),
+            start = Offset(gazeX + radius - (1f * markerScale), gazeY),
             end = Offset(gazeX + radius + tickLen, gazeY),
-            strokeWidth = 1.0f
+            strokeWidth = strokeW
         )
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = 0.85f),
+            color = reticleColor.copy(alpha = tickAlpha),
             start = Offset(gazeX, gazeY - radius - tickLen),
-            end = Offset(gazeX, gazeY - radius + 1f),
-            strokeWidth = 1.0f
+            end = Offset(gazeX, gazeY - radius + (1f * markerScale)),
+            strokeWidth = strokeW
         )
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = 0.85f),
-            start = Offset(gazeX, gazeY + radius - 1f),
+            color = reticleColor.copy(alpha = tickAlpha),
+            start = Offset(gazeX, gazeY + radius - (1f * markerScale)),
             end = Offset(gazeX, gazeY + radius + tickLen),
-            strokeWidth = 1.0f
+            strokeWidth = strokeW
         )
     }
 }

@@ -749,7 +749,149 @@ fun ParentDashboardScreen(
                 }
             }
 
-            // 5. Remote Action Buttons (Calibration & Exit)
+            // 6. Eye Gaze Marker Controls & Customization
+            Text(
+                text = "🎯 Eye Gaze Marker Controls",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (isOnline) 1.0f else 0.5f),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Toggle Switch for Marker Visibility on Child Tablet
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Show Gaze Marker on Child Screen",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (state.showGazeMarker) "Marker visible to guide therapist/child" else "Hidden (pure immersive visual mode)",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = state.showGazeMarker,
+                            onCheckedChange = { isChecked ->
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "gaze_marker", isChecked.toString())
+                                }
+                            },
+                            enabled = isOnline
+                        )
+                    }
+
+                    if (state.showGazeMarker) {
+                        // Marker Size Slider
+                        Column {
+                            Text(
+                                text = "Marker Size: ${"%.2f".format(state.gazeMarkerSize)}x (${(state.gazeMarkerSize * 100).toInt()}%)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.gazeMarkerSize.coerceIn(0.5f, 2.5f),
+                                onValueChange = { size ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "gaze_marker_size", "%.2f".format(size))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.5f..2.5f
+                            )
+                        }
+
+                        // Marker Opacity Slider
+                        Column {
+                            Text(
+                                text = "Marker Opacity: ${(state.gazeMarkerOpacity * 100).toInt()}%",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Slider(
+                                value = state.gazeMarkerOpacity.coerceIn(0.1f, 1.0f),
+                                onValueChange = { opacity ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "gaze_marker_opacity", "%.2f".format(opacity))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 0.1f..1.0f
+                            )
+                        }
+
+                        // Marker Color Picker
+                        Column {
+                            Text(
+                                text = "Marker Color: ${state.gazeMarkerColor}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val colors = listOf(
+                                    Triple("CYAN", "🔵 Cyan", Color(0xFF00E5FF)),
+                                    Triple("GREEN", "🟢 Green", Color(0xFF00E676)),
+                                    Triple("MAGENTA", "🌸 Pink", Color(0xFFE040FB)),
+                                    Triple("GOLD", "🟡 Gold", Color(0xFFFFD54F)),
+                                    Triple("WHITE", "⚪ White", Color.White)
+                                )
+
+                                for ((colorKey, label, chipColor) in colors) {
+                                    val isSelected = state.gazeMarkerColor.equals(colorKey, ignoreCase = true)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            if (isOnline) {
+                                                mqttClient.sendCommand(state.topicPrefix, "gaze_marker_color", colorKey)
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                text = label,
+                                                fontSize = 10.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        enabled = isOnline,
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = chipColor.copy(alpha = 0.35f),
+                                            selectedLabelColor = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        border = if (isSelected) FilterChipDefaults.filterChipBorder(
+                                            borderColor = chipColor,
+                                            borderWidth = 1.5.dp,
+                                            enabled = isOnline,
+                                            selected = isSelected
+                                        ) else null,
+                                        modifier = Modifier.height(32.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 7. Remote Action Buttons (Calibration & Exit)
             Text(
                 text = "Parent Actions & Safety",
                 fontWeight = FontWeight.Bold,
