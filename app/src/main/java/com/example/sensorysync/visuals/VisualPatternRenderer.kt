@@ -116,7 +116,7 @@ class VisualPatternRenderer {
         }
         renderSparkles(drawScope, dt)
 
-        // 5. Render Fluid Hydrodynamic Jellyfish with Peristaltic Wave Mechanics
+        // 5. Render Fluid Hydrodynamic Jellyfish with Smoke-like Ethereal Oral Arms
         renderFluidHydrodynamicJellyfish(drawScope, state, jx, jy, width, height)
 
         // 6. Render Foreground Floating Bokeh Orbs
@@ -316,19 +316,18 @@ class VisualPatternRenderer {
         val freq = state.strobeFrequencyHz.coerceIn(0.2f, 3.0f)
         val cycle = animTime * freq * 2.0 * PI
 
-        // 1. Biomechanical Peristaltic Wave Parameters (Apex contracts first, wave travels to rim)
-        val crownPulse = sin(cycle).toFloat() // Crown contraction/expansion
-        val flankPulse = sin(cycle - 0.75).toFloat() // Mid-flank contraction lag
-        val rimPulse = sin(cycle - 1.50).toFloat() // Skirt / lappet rim contraction lag
+        // 1. Biomechanical Peristaltic Wave Parameters
+        val crownPulse = sin(cycle).toFloat()
+        val flankPulse = sin(cycle - 0.75).toFloat()
+        val rimPulse = sin(cycle - 1.50).toFloat()
 
         val minDim = width.coerceAtMost(height)
         val baseScale = minDim * 0.18f
 
-        // Dynamic fluid dimensions with peristaltic wave bulge
-        val crownSquashY = crownPulse * (baseScale * 0.10f) // Crown pushes down/forward
-        val shoulderBulgeX = (1.0f - crownPulse * 0.15f) // Shoulder expands during thrust
-        val flankBulgeX = (1.0f - flankPulse * 0.22f) // Flank wave travels
-        val rimExpansionX = (1.0f - rimPulse * 0.28f) // Rim flares then snaps inward into jet cone
+        val crownSquashY = crownPulse * (baseScale * 0.10f)
+        val shoulderBulgeX = (1.0f - crownPulse * 0.15f)
+        val flankBulgeX = (1.0f - flankPulse * 0.22f)
+        val rimExpansionX = (1.0f - rimPulse * 0.28f)
 
         val bellRadiusX = baseScale * 1.05f
         val bellHeight = baseScale * 0.95f
@@ -341,7 +340,6 @@ class VisualPatternRenderer {
             val topApexY = centerY - bellHeight * 0.90f + crownSquashY
             val rimBaseY = centerY + bellHeight * 0.18f
 
-            // Key Hydrodynamic Profile Control Points
             val apexPt = Offset(centerX, topApexY)
             val leftShoulder = Offset(centerX - bellRadiusX * 0.65f * shoulderBulgeX, centerY - bellHeight * 0.55f)
             val rightShoulder = Offset(centerX + bellRadiusX * 0.65f * shoulderBulgeX, centerY - bellHeight * 0.55f)
@@ -350,7 +348,7 @@ class VisualPatternRenderer {
             val leftSkirt = Offset(centerX - bellRadiusX * rimExpansionX, rimBaseY)
             val rightSkirt = Offset(centerX + bellRadiusX * rimExpansionX, rimBaseY)
 
-            // A. Atmospheric Cyan Volumetric Halo (Bioluminescent Bloom)
+            // A. Atmospheric Cyan Volumetric Halo
             val haloRadius = bellRadiusX * (2.4f + focusGlowBoost)
             drawScope.drawCircle(
                 brush = Brush.radialGradient(
@@ -378,7 +376,6 @@ class VisualPatternRenderer {
                     centerX + rimRx * 0.95f, rimBaseY - rimRy * 2.5f - flankPulse * 10f,
                     centerX + rimRx, rimBaseY
                 )
-                // 3D undulating elliptical under-margin with water drag
                 cubicTo(
                     centerX + rimRx * 0.5f, rimBaseY + rimRy * 1.1f + sin(animTime * 3.5f) * 4f,
                     centerX - rimRx * 0.5f, rimBaseY + rimRy * 1.1f + sin(animTime * 3.5f + PI.toFloat()) * 4f,
@@ -399,7 +396,7 @@ class VisualPatternRenderer {
                 )
             )
 
-            // D. 4 Luminous Horseshoe Gonad Organs (Fluidly Pulsing in Cavity)
+            // D. 4 Luminous Horseshoe Gonad Organs
             val gonadRadius = (baseScale * 0.32f + (1f - flankPulse) * 7f) * (1f + focusGlowBoost * 0.35f)
             val gonadCenter = Offset(centerX, centerY - bellHeight * 0.24f + crownSquashY * 0.5f)
             for (i in 0 until 4) {
@@ -422,14 +419,13 @@ class VisualPatternRenderer {
                 )
             }
 
-            // E. Cascading Ruffled Chiffon Silk Oral Arms
-            renderRuffledChiffonOralArms(drawScope, centerX, rimBaseY, bellRadiusX * rimExpansionX, baseScale, rimPulse, focusGlowBoost)
+            // E. SMOKE-LIKE ETHEREAL ORAL ARMS (Multi-layered Billowing Wisps & Vapor Tendrils)
+            renderEtherealSmokeOralArms(drawScope, centerX, rimBaseY, bellRadiusX * rimExpansionX, baseScale, rimPulse, focusGlowBoost)
 
-            // F. Fluid 18-Point Hydrodynamic Bell Surface (Multi-Segment Peristaltic Spline)
+            // F. Fluid 18-Point Hydrodynamic Bell Surface
             val fluidBellPath = Path().apply {
                 moveTo(leftSkirt.x, leftSkirt.y)
 
-                // Left flank: Skirt -> Mid Flank -> Shoulder -> Apex
                 cubicTo(
                     leftFlank.x * 1.02f, leftFlank.y + bellHeight * 0.12f,
                     leftFlank.x, leftFlank.y,
@@ -441,7 +437,6 @@ class VisualPatternRenderer {
                     apexPt.x, apexPt.y
                 )
 
-                // Right flank: Apex -> Shoulder -> Mid Flank -> Skirt
                 cubicTo(
                     apexPt.x + bellRadiusX * 0.35f, apexPt.y,
                     rightShoulder.x - bellRadiusX * 0.15f, rightShoulder.y - bellHeight * 0.18f,
@@ -453,7 +448,6 @@ class VisualPatternRenderer {
                     rightSkirt.x, rightSkirt.y
                 )
 
-                // 3D Undulating Elliptical Margin with 16 Flexible Lappet Ripples
                 val numLappets = 16
                 val rimW = (rightSkirt.x - leftSkirt.x)
                 for (lp in numLappets downTo 1) {
@@ -473,21 +467,19 @@ class VisualPatternRenderer {
                 close()
             }
 
-            // Layer 1: Fluid Translucent Glass Gradient (Cyan Crown -> Rose Subsurface)
             val capGradient = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFFE0F7FA).copy(alpha = 0.92f + focusGlowBoost * 0.08f), // Apex Specular Crown
-                    Color(0xFF00E5FF).copy(alpha = 0.75f + focusGlowBoost * 0.15f), // Cyan Luminescence
+                    Color(0xFFE0F7FA).copy(alpha = 0.92f + focusGlowBoost * 0.08f),
+                    Color(0xFF00E5FF).copy(alpha = 0.75f + focusGlowBoost * 0.15f),
                     Color(0xFF4DD0E1).copy(alpha = 0.58f),
-                    Color(0xFFF48FB1).copy(alpha = 0.42f), // Rose Subsurface Tint
-                    Color(0xFFCE93D8).copy(alpha = 0.28f)  // Lavender Edge
+                    Color(0xFFF48FB1).copy(alpha = 0.42f),
+                    Color(0xFFCE93D8).copy(alpha = 0.28f)
                 ),
                 center = Offset(centerX, topApexY + bellHeight * 0.28f),
                 radius = bellRadiusX * 1.25f
             )
             drawScope.drawPath(path = fluidBellPath, brush = capGradient)
 
-            // Layer 2: Soft Photographic Feathered Edge Bloom
             drawScope.drawPath(
                 path = fluidBellPath,
                 color = Color(0xFF00E5FF).copy(alpha = 0.45f + focusGlowBoost * 0.2f),
@@ -499,10 +491,10 @@ class VisualPatternRenderer {
                 style = Stroke(width = 1.4f)
             )
 
-            // G. 24 Radial Meridians (Dynamically Tracking the Fluid Spline Mesh)
+            // G. 24 Radial Meridians Tracking Fluid Spline Mesh
             val numMeridians = 24
             for (m in 0..numMeridians) {
-                val u = (m.toFloat() / numMeridians - 0.5f) * 2f // -1.0 to 1.0
+                val u = (m.toFloat() / numMeridians - 0.5f) * 2f
                 val meridianFlankX = centerX + u * (bellRadiusX * 0.92f * (1.0f - flankPulse * 0.18f))
                 val meridianSkirtX = centerX + u * (bellRadiusX * rimExpansionX * 0.90f)
 
@@ -527,7 +519,7 @@ class VisualPatternRenderer {
         }
     }
 
-    private fun renderRuffledChiffonOralArms(
+    private fun renderEtherealSmokeOralArms(
         drawScope: DrawScope,
         centerX: Float,
         rimBaseY: Float,
@@ -536,70 +528,73 @@ class VisualPatternRenderer {
         pulseVal: Float,
         focusGlowBoost: Float
     ) {
-        val numArms = 3
-        val armLength = baseScale * 3.0f
+        val numPlumes = 4 // 4 Organic Central Smoke Plumes
+        val plumeLength = baseScale * 3.2f
 
-        for (a in 0 until numArms) {
-            val armOffset = (a - 1f) * (bellRadiusX * 0.28f)
-            val startX = centerX + armOffset
-            val startY = rimBaseY - 8f
+        for (p in 0 until numPlumes) {
+            val rootOffsetX = (p - 1.5f) * (bellRadiusX * 0.26f)
+            val rootX = centerX + rootOffsetX
+            val rootY = rimBaseY - 10f
 
-            val leftRibbonPath = Path()
-            val rightRibbonPath = Path()
-            val centerSpine = mutableListOf<Offset>()
+            // 1. Soft Volumetric Smoke Puffs (Gaussian Diffusion along plume spine)
+            val numPuffs = 9
+            for (i in 0 until numPuffs) {
+                val progress = i.toFloat() / (numPuffs - 1)
+                val waveX = sin(animTime * 3.2f + p * 1.4f + progress * 3.8f) * (22f * (progress + 0.3f))
+                val waveY = cos(animTime * 2.0f + p * 0.9f + progress * 2.5f) * 8f
+                val puffX = rootX + waveX
+                val puffY = rootY + progress * plumeLength + waveY
 
-            val segments = 20
-            for (s in 0..segments) {
-                val progress = s.toFloat() / segments
-                val wave1 = sin(animTime * 3.5f + a * 1.5f + progress * 4.2f) * (26f * (progress + 0.3f))
-                val wave2 = cos(animTime * 2.2f + a * 1.1f + progress * 3.0f) * (16f * (progress + 0.3f))
-                val curX = startX + wave1 + wave2
-                val curY = startY + progress * armLength
-                centerSpine.add(Offset(curX, curY))
+                val puffRadius = baseScale * (0.16f + progress * 0.24f)
+                val puffAlpha = (0.28f * (1.0f - progress * 0.55f) + focusGlowBoost * 0.15f).coerceIn(0.05f, 0.65f)
+
+                val puffColor = if (p % 2 == 0) Color(0xFFF48FB1) else Color(0xFFCE93D8)
+                drawScope.drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            puffColor.copy(alpha = puffAlpha),
+                            puffColor.copy(alpha = puffAlpha * 0.35f),
+                            Color.Transparent
+                        ),
+                        center = Offset(puffX, puffY),
+                        radius = puffRadius
+                    ),
+                    radius = puffRadius,
+                    center = Offset(puffX, puffY)
+                )
             }
 
-            val ribbonWidth = baseScale * 0.24f * (1f - (a % 2) * 0.2f)
-            leftRibbonPath.moveTo(centerSpine[0].x - ribbonWidth * 0.5f, centerSpine[0].y)
-            rightRibbonPath.moveTo(centerSpine[0].x + ribbonWidth * 0.5f, centerSpine[0].y)
+            // 2. Interweaving Ethereal Smoke Tendril Wisps (12 Billowing Fluid Micro-Strands per Plume)
+            val numWisps = 12
+            for (w in 0 until numWisps) {
+                val wispPath = Path()
+                val wispOffset = (w - (numWisps / 2f)) * 3.2f
+                wispPath.moveTo(rootX + wispOffset, rootY)
 
-            for (s in 1..segments) {
-                val pt = centerSpine[s]
-                val progress = s.toFloat() / segments
-                val ruff = sin(animTime * 5.0f + s * 0.9f + a) * 7.5f + cos(animTime * 8.0f + s * 1.8f) * 3.5f
-                val w = (ribbonWidth * (1f - progress * 0.65f) + ruff).coerceAtLeast(3.5f)
-
-                leftRibbonPath.lineTo(pt.x - w, pt.y)
-                rightRibbonPath.lineTo(pt.x + w, pt.y)
-            }
-
-            val closedRibbon = Path().apply {
-                addPath(leftRibbonPath)
-                for (s in segments downTo 0) {
-                    val pt = centerSpine[s]
+                val segments = 22
+                for (s in 1..segments) {
                     val progress = s.toFloat() / segments
-                    val ruff = sin(animTime * 5.0f + s * 0.9f + a) * 7.5f + cos(animTime * 8.0f + s * 1.8f) * 3.5f
-                    val w = (ribbonWidth * (1f - progress * 0.65f) + ruff).coerceAtLeast(3.5f)
-                    lineTo(pt.x + w, pt.y)
+                    val noise1 = sin(animTime * (2.8f + w * 0.2f) + p * 1.5f + progress * (4.2f + w * 0.3f)) * (18f * (progress + 0.25f))
+                    val noise2 = cos(animTime * 1.6f + progress * 3.0f + w * 0.6f) * (14f * (progress + 0.25f))
+                    val vortexCurl = if (progress > 0.6f) sin(animTime * 4.0f + s * 0.8f + w) * (progress * 12f) else 0f
+
+                    val wx = rootX + wispOffset * (1f + progress * 2.5f) + noise1 + noise2 + vortexCurl
+                    val wy = rootY + progress * plumeLength
+                    wispPath.lineTo(wx, wy)
                 }
-                close()
+
+                // Dual-tone bioluminescent smoke colors with soft gradient fade
+                val isCyanSmoke = (w % 3 == 0)
+                val wispColor = if (isCyanSmoke) Color(0xFF80DEEA) else if (p % 2 == 0) Color(0xFFFF80AB) else Color(0xFFE1BEE7)
+                val wispAlpha = (0.24f - (w % 3) * 0.05f + focusGlowBoost * 0.15f).coerceIn(0.04f, 0.45f)
+                val strokeW = if (w % 2 == 0) 2.4f else 1.2f
+
+                drawScope.drawPath(
+                    path = wispPath,
+                    color = wispColor.copy(alpha = wispAlpha),
+                    style = Stroke(width = strokeW, cap = StrokeCap.Round)
+                )
             }
-
-            val silkColor = if (a == 1) Color(0xFFF48FB1) else Color(0xFFCE93D8)
-            drawScope.drawPath(
-                path = closedRibbon,
-                color = silkColor.copy(alpha = (0.32f + focusGlowBoost * 0.2f).coerceIn(0.1f, 0.75f))
-            )
-
-            drawScope.drawPath(
-                path = leftRibbonPath,
-                color = Color(0xFF80DEEA).copy(alpha = 0.80f + focusGlowBoost * 0.2f),
-                style = Stroke(width = 1.5f, cap = StrokeCap.Round)
-            )
-            drawScope.drawPath(
-                path = rightRibbonPath,
-                color = Color(0xFFFF80AB).copy(alpha = 0.80f + focusGlowBoost * 0.2f),
-                style = Stroke(width = 1.5f, cap = StrokeCap.Round)
-            )
         }
     }
 
