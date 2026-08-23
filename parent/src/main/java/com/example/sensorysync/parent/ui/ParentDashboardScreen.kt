@@ -3,8 +3,10 @@ package com.example.sensorysync.parent.ui
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,6 +41,7 @@ fun ParentDashboardScreen(
 ) {
     val isOnline = state.isMqttConnected && state.isTabletOnline
     val canAcquireFace = isOnline && !state.isFaceLocked && state.isGazeDetected
+    var isAttentionOptionsExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -259,12 +262,12 @@ fun ParentDashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Trigger & Stop Action Buttons
+                    // Trigger & Stop Action Row with Foldable Arrow Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
@@ -275,7 +278,7 @@ fun ParentDashboardScreen(
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C4DFF)),
-                            contentPadding = PaddingValues(vertical = 8.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp),
                             enabled = isOnline
                         ) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = "Get Attention", modifier = Modifier.size(16.dp))
@@ -297,6 +300,18 @@ fun ParentDashboardScreen(
                                 Text("⏹️ Stop", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+
+                        // Small Arrow Toggle Button for Foldable Settings
+                        IconButton(
+                            onClick = { isAttentionOptionsExpanded = !isAttentionOptionsExpanded },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isAttentionOptionsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (isAttentionOptionsExpanded) "Collapse Options" else "Expand Options",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     if (state.isAttentionActive || state.attentionRemainingTimeSec > 0f) {
@@ -314,61 +329,73 @@ fun ParentDashboardScreen(
                         }
                     }
 
-                    // Duration Slider
-                    Column {
-                        Text(
-                            text = "Band Duration: ${"%.1f".format(state.attentionDurationSec)}s",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = state.attentionDurationSec.coerceIn(1.0f, 15.0f),
-                            onValueChange = { dur ->
-                                if (isOnline) {
-                                    mqttClient.sendCommand(state.topicPrefix, "attention_duration", "%.1f".format(dur))
-                                }
-                            },
-                            enabled = isOnline,
-                            valueRange = 1.0f..15.0f
-                        )
-                    }
+                    // Foldable Sliders Section
+                    AnimatedVisibility(
+                        visible = isAttentionOptionsExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            // Duration Slider
+                            Column {
+                                Text(
+                                    text = "Band Duration: ${"%.1f".format(state.attentionDurationSec)}s",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = state.attentionDurationSec.coerceIn(1.0f, 15.0f),
+                                    onValueChange = { dur ->
+                                        if (isOnline) {
+                                            mqttClient.sendCommand(state.topicPrefix, "attention_duration", "%.1f".format(dur))
+                                        }
+                                    },
+                                    enabled = isOnline,
+                                    valueRange = 1.0f..15.0f
+                                )
+                            }
 
-                    // Opacity Slider
-                    Column {
-                        Text(
-                            text = "Band Opacity: ${(state.attentionOpacity * 100).toInt()}%",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = state.attentionOpacity.coerceIn(0.1f, 1.0f),
-                            onValueChange = { op ->
-                                if (isOnline) {
-                                    mqttClient.sendCommand(state.topicPrefix, "attention_opacity", "%.2f".format(op))
-                                }
-                            },
-                            enabled = isOnline,
-                            valueRange = 0.1f..1.0f
-                        )
-                    }
+                            // Opacity Slider
+                            Column {
+                                Text(
+                                    text = "Band Opacity: ${(state.attentionOpacity * 100).toInt()}%",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = state.attentionOpacity.coerceIn(0.1f, 1.0f),
+                                    onValueChange = { op ->
+                                        if (isOnline) {
+                                            mqttClient.sendCommand(state.topicPrefix, "attention_opacity", "%.2f".format(op))
+                                        }
+                                    },
+                                    enabled = isOnline,
+                                    valueRange = 0.1f..1.0f
+                                )
+                            }
 
-                    // Band Width Slider
-                    Column {
-                        Text(
-                            text = "Band Width: ${state.attentionBandWidthDp.toInt()} dp",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = state.attentionBandWidthDp.coerceIn(10.0f, 80.0f),
-                            onValueChange = { bw ->
-                                if (isOnline) {
-                                    mqttClient.sendCommand(state.topicPrefix, "attention_band_width", "%.0f".format(bw))
-                                }
-                            },
-                            enabled = isOnline,
-                            valueRange = 10.0f..80.0f
-                        )
+                            // Band Width Slider
+                            Column {
+                                Text(
+                                    text = "Band Width: ${state.attentionBandWidthDp.toInt()} dp",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = state.attentionBandWidthDp.coerceIn(10.0f, 80.0f),
+                                    onValueChange = { bw ->
+                                        if (isOnline) {
+                                            mqttClient.sendCommand(state.topicPrefix, "attention_band_width", "%.0f".format(bw))
+                                        }
+                                    },
+                                    enabled = isOnline,
+                                    valueRange = 10.0f..80.0f
+                                )
+                            }
+                        }
                     }
                 }
             }

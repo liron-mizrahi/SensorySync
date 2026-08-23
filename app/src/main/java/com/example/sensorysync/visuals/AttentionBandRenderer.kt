@@ -1,9 +1,12 @@
 package com.example.sensorysync.visuals
 
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.example.sensorysync.model.ControlState
@@ -46,7 +49,7 @@ class AttentionBandRenderer {
 
         val dt = frameDeltaTime.coerceIn(0.001f, 0.05f)
         activeRemainingSec -= dt
-        animTime += dt * 3.5f // Rotation speed
+        animTime += dt * 2.8f // Smooth rotation speed
 
         if (activeRemainingSec <= 0f) {
             activeRemainingSec = 0f
@@ -57,95 +60,73 @@ class AttentionBandRenderer {
         val h = drawScope.size.height
         val density = drawScope.density
 
-        // Compute fade-in (first 0.2s) and fade-out (last 0.3s)
+        // Compute fade-in (first 0.2s) and fade-out (last 0.35s)
         val elapsed = activeDurationSec - activeRemainingSec
         val fadeIn = (elapsed / 0.2f).coerceIn(0f, 1f)
-        val fadeOut = (activeRemainingSec / 0.3f).coerceIn(0f, 1f)
+        val fadeOut = (activeRemainingSec / 0.35f).coerceIn(0f, 1f)
         val envelope = fadeIn * fadeOut
 
         val baseOpacity = (state.attentionOpacity.coerceIn(0.1f, 1.0f) * envelope).coerceIn(0f, 1f)
-        val bandWidth = (state.attentionBandWidthDp * density).coerceIn(16f, 320f)
+        val bandWidth = (state.attentionBandWidthDp * density).coerceIn(14f, 280f)
+        val cornerRad = (bandWidth * 1.5f + 32f * density).coerceIn(24f, 180f)
+        val center = Offset(w / 2f, h / 2f)
 
-        // 1. Generate 12-Stop Rotating Rainbow Spectrum
-        val basePhase = (animTime * 90f) % 360f
-        val rainbowColors = List(12) { i ->
-            val hue = (basePhase + (i * 30f)) % 360f
+        // 1. Generate 16-Stop Rotating Rainbow Spectrum for continuous Sweep Gradient
+        val basePhase = (animTime * 85f) % 360f
+        val rainbowColors = List(17) { i ->
+            val hue = (basePhase + (i * (360f / 16f))) % 360f
             Color.hsv(hue, 1.0f, 1.0f, baseOpacity)
         }
+        val glowColors = rainbowColors.map { it.copy(alpha = baseOpacity * 0.40f) }
+        val deepGlowColors = rainbowColors.map { it.copy(alpha = baseOpacity * 0.20f) }
 
-        // 2. Multi-stop Linear Gradient Perimeter Borders
-        val topBrush = Brush.horizontalGradient(colors = rainbowColors, startX = 0f, endX = w)
-        val bottomBrush = Brush.horizontalGradient(colors = rainbowColors.reversed(), startX = 0f, endX = w)
-        val leftBrush = Brush.verticalGradient(colors = rainbowColors.reversed(), startY = 0f, endY = h)
-        val rightBrush = Brush.verticalGradient(colors = rainbowColors, startY = 0f, endY = h)
+        val sweepRainbowBrush = Brush.sweepGradient(colors = rainbowColors, center = center)
+        val sweepGlowBrush = Brush.sweepGradient(colors = glowColors, center = center)
+        val sweepDeepGlowBrush = Brush.sweepGradient(colors = deepGlowColors, center = center)
 
-        // A. Soft Inward Bloom Glow (Feathered Aura)
-        val glowWidth = bandWidth * 1.8f
-
-        // Top Inward Glow
-        drawScope.drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(rainbowColors[0].copy(alpha = baseOpacity * 0.6f), Color.Transparent),
-                startY = 0f,
-                endY = glowWidth
-            ),
-            topLeft = Offset(0f, 0f),
-            size = Size(w, glowWidth)
+        // A. Layer 1: Wide Inward & Outward Ambient Atmospheric Bloom (Smooth Rounded Rect)
+        drawScope.drawRoundRect(
+            brush = sweepDeepGlowBrush,
+            topLeft = Offset(bandWidth * 0.3f, bandWidth * 0.3f),
+            size = Size(w - bandWidth * 0.6f, h - bandWidth * 0.6f),
+            cornerRadius = CornerRadius(cornerRad * 1.25f, cornerRad * 1.25f),
+            style = Stroke(width = bandWidth * 2.4f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
-        // Bottom Inward Glow
-        drawScope.drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Transparent, rainbowColors[6].copy(alpha = baseOpacity * 0.6f)),
-                startY = h - glowWidth,
-                endY = h
-            ),
-            topLeft = Offset(0f, h - glowWidth),
-            size = Size(w, glowWidth)
+        // B. Layer 2: Mid-range Feathered Radiant Aura
+        drawScope.drawRoundRect(
+            brush = sweepGlowBrush,
+            topLeft = Offset(bandWidth * 0.4f, bandWidth * 0.4f),
+            size = Size(w - bandWidth * 0.8f, h - bandWidth * 0.8f),
+            cornerRadius = CornerRadius(cornerRad * 1.12f, cornerRad * 1.12f),
+            style = Stroke(width = bandWidth * 1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
-        // Left Inward Glow
-        drawScope.drawRect(
-            brush = Brush.horizontalGradient(
-                colors = listOf(rainbowColors[9].copy(alpha = baseOpacity * 0.6f), Color.Transparent),
-                startX = 0f,
-                endX = glowWidth
-            ),
-            topLeft = Offset(0f, 0f),
-            size = Size(glowWidth, h)
+        // C. Layer 3: Core Solid Vibrant Rainbow Rounded Border
+        drawScope.drawRoundRect(
+            brush = sweepRainbowBrush,
+            topLeft = Offset(bandWidth * 0.5f, bandWidth * 0.5f),
+            size = Size(w - bandWidth, h - bandWidth),
+            cornerRadius = CornerRadius(cornerRad, cornerRad),
+            style = Stroke(width = bandWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
-        // Right Inward Glow
-        drawScope.drawRect(
-            brush = Brush.horizontalGradient(
-                colors = listOf(Color.Transparent, rainbowColors[3].copy(alpha = baseOpacity * 0.6f)),
-                startX = w - glowWidth,
-                endX = w
-            ),
-            topLeft = Offset(w - glowWidth, 0f),
-            size = Size(glowWidth, h)
-        )
-
-        // B. Core Solid Vibrant Border Bars
-        drawScope.drawRect(brush = topBrush, topLeft = Offset(0f, 0f), size = Size(w, bandWidth))
-        drawScope.drawRect(brush = bottomBrush, topLeft = Offset(0f, h - bandWidth), size = Size(w, bandWidth))
-        drawScope.drawRect(brush = leftBrush, topLeft = Offset(0f, 0f), size = Size(bandWidth, h))
-        drawScope.drawRect(brush = rightBrush, topLeft = Offset(w - bandWidth, 0f), size = Size(bandWidth, h))
-
-        // C. Crisp Inner White Holographic Accent Line
-        val innerLineColor = Color.White.copy(alpha = 0.9f * baseOpacity)
-        drawScope.drawRect(
-            color = innerLineColor,
+        // D. Layer 4: Crisp Inner Holographic Accent Border (Rounded)
+        val innerRad = (cornerRad - bandWidth * 0.5f).coerceAtLeast(8f)
+        drawScope.drawRoundRect(
+            color = Color.White.copy(alpha = 0.92f * baseOpacity),
             topLeft = Offset(bandWidth, bandWidth),
-            size = Size(w - 2 * bandWidth, h - 2 * bandWidth),
-            style = Stroke(width = 3.5f)
+            size = Size(w - 2f * bandWidth, h - 2f * bandWidth),
+            cornerRadius = CornerRadius(innerRad, innerRad),
+            style = Stroke(width = 3.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
-        // D. 4 Corner Rotating Prismatic Shimmer Stars
-        renderCornerShimmer(drawScope, bandWidth * 0.9f, bandWidth * 0.9f, animTime, baseOpacity)
-        renderCornerShimmer(drawScope, w - bandWidth * 0.9f, bandWidth * 0.9f, animTime + 1f, baseOpacity)
-        renderCornerShimmer(drawScope, w - bandWidth * 0.9f, h - bandWidth * 0.9f, animTime + 2f, baseOpacity)
-        renderCornerShimmer(drawScope, bandWidth * 0.9f, h - bandWidth * 0.9f, animTime + 3f, baseOpacity)
+        // E. 4 Prismatic Shimmer Starbursts at the Rounded Corners
+        val cornerOffset = cornerRad * 0.75f
+        renderCornerShimmer(drawScope, cornerOffset, cornerOffset, animTime, baseOpacity)
+        renderCornerShimmer(drawScope, w - cornerOffset, cornerOffset, animTime + 1f, baseOpacity)
+        renderCornerShimmer(drawScope, w - cornerOffset, h - cornerOffset, animTime + 2f, baseOpacity)
+        renderCornerShimmer(drawScope, cornerOffset, h - cornerOffset, animTime + 3f, baseOpacity)
     }
 
     private fun renderCornerShimmer(
@@ -155,30 +136,32 @@ class AttentionBandRenderer {
         time: Float,
         opacity: Float
     ) {
-        val pulse = (sin(time * 6f) * 0.3f + 0.7f)
-        val starRadius = 24f * pulse
+        val pulse = (sin(time * 6f) * 0.35f + 0.65f)
+        val starRadius = 26f * pulse
         val starColor = Color.White.copy(alpha = 0.95f * opacity)
 
         drawScope.drawCircle(
-            color = Color(0xFF00E5FF).copy(alpha = 0.45f * opacity),
+            color = Color(0xFF00E5FF).copy(alpha = 0.50f * opacity),
             radius = starRadius * 1.8f,
             center = Offset(cx, cy)
         )
         drawScope.drawCircle(
             color = starColor,
-            radius = 4.0f * pulse,
+            radius = 4.5f * pulse,
             center = Offset(cx, cy)
         )
 
+        // 4-point rotating cross star
         for (a in 0..3) {
-            val angle = (time * 1.5f + (a * PI.toFloat() / 2f))
+            val angle = (time * 1.8f + (a * PI.toFloat() / 2f))
             val ex = cx + cos(angle) * starRadius
             val ey = cy + sin(angle) * starRadius
             drawScope.drawLine(
                 color = starColor,
                 start = Offset(cx, cy),
                 end = Offset(ex, ey),
-                strokeWidth = 2.5f
+                strokeWidth = 2.8f,
+                cap = StrokeCap.Round
             )
         }
     }
