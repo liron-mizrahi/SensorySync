@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.view.PreviewView
+import com.example.sensorysync.audio.AttentionAudioPlayer
 import com.example.sensorysync.model.ControlState
 import com.example.sensorysync.model.VisualPattern
 import com.example.sensorysync.visuals.AttentionBandRenderer
@@ -37,8 +38,15 @@ fun SensoryScreen(
     val jellyfishRenderer = remember { VisualPatternRenderer() }
     val bubbleRenderer = remember { BubbleBloomRenderer() }
     val attentionRenderer = remember { AttentionBandRenderer() }
+    val attentionAudioPlayer = remember { AttentionAudioPlayer() }
     var animationTick by remember { mutableLongStateOf(0L) }
     var lastFrameTime by remember { mutableLongStateOf(0L) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            attentionAudioPlayer.stop()
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -60,6 +68,9 @@ fun SensoryScreen(
     LaunchedEffect(state.attentionTriggerTimestamp) {
         if (state.attentionTriggerTimestamp > 0L) {
             attentionRenderer.trigger(state.attentionDurationSec)
+            if (state.attentionSoundEnabled) {
+                attentionAudioPlayer.playAttentionChime(state.attentionSoundVolume)
+            }
         }
     }
 

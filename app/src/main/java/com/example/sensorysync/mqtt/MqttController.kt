@@ -138,6 +138,14 @@ class MqttController(
                     val bw = value.toFloatOrNull()?.coerceIn(10.0f, 80.0f) ?: attentionBandWidthDp
                     copy(attentionBandWidthDp = bw)
                 }
+                "attention_sound", "attention_sound_enabled", "attn_sound" -> {
+                    val enabled = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
+                    copy(attentionSoundEnabled = enabled)
+                }
+                "attention_sound_volume", "attention_volume", "attn_volume" -> {
+                    val vol = value.toFloatOrNull()?.coerceIn(0.1f, 1.0f) ?: attentionSoundVolume
+                    copy(attentionSoundVolume = vol)
+                }
 
                 "camera_preview" -> {
                     val show = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
@@ -247,6 +255,8 @@ class MqttController(
                 put("attentionDurationSec", state.attentionDurationSec)
                 put("attentionOpacity", state.attentionOpacity)
                 put("attentionBandWidthDp", state.attentionBandWidthDp)
+                put("attentionSoundEnabled", state.attentionSoundEnabled)
+                put("attentionSoundVolume", state.attentionSoundVolume.toDouble())
                 put("attentionRemainingTimeSec", state.attentionRemainingTimeSec)
                 put("jellyfishScale", state.jellyfishScale)
                 put("bubbleCount", state.bubbleCount)

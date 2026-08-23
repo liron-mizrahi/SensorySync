@@ -62,11 +62,13 @@ data class ParentControlState(
     val gazeMarkerOpacity: Float = 0.8f,
     val gazeMarkerColor: String = "CYAN",
 
-    // Get Attention Rainbow Boundary Band
+    // Get Attention Rainbow Boundary Band & Audio Stimulation
     val isAttentionActive: Boolean = false,
     val attentionDurationSec: Float = 4.0f,
     val attentionOpacity: Float = 0.85f,
     val attentionBandWidthDp: Float = 36.0f,
+    val attentionSoundEnabled: Boolean = true,
+    val attentionSoundVolume: Float = 0.85f,
     val attentionRemainingTimeSec: Float = 0.0f
 )
 
@@ -190,6 +192,8 @@ class ParentMqttClient(
                     attentionDurationSec = json.optDouble("attentionDurationSec", 4.0).toFloat(),
                     attentionOpacity = json.optDouble("attentionOpacity", 0.85).toFloat(),
                     attentionBandWidthDp = json.optDouble("attentionBandWidthDp", 36.0).toFloat(),
+                    attentionSoundEnabled = json.optBoolean("attentionSoundEnabled", true),
+                    attentionSoundVolume = json.optDouble("attentionSoundVolume", 0.85).toFloat(),
                     attentionRemainingTimeSec = json.optDouble("attentionRemainingTimeSec", 0.0).toFloat(),
                     jellyfishScale = json.optDouble("jellyfishScale", 0.5).toFloat(),
                     bubbleCount = json.optInt("bubbleCount", 12),
@@ -234,6 +238,15 @@ class ParentMqttClient(
                 "attention_band_width", "attn_width", "band_width" -> {
                     payload.toFloatOrNull()?.let { bw ->
                         onStateUpdate { copy(attentionBandWidthDp = bw) }
+                    }
+                }
+                "attention_sound", "attention_sound_enabled", "attn_sound" -> {
+                    val enabled = payload.toBooleanStrictOrNull() ?: (payload == "1" || payload.equals("true", ignoreCase = true))
+                    onStateUpdate { copy(attentionSoundEnabled = enabled) }
+                }
+                "attention_sound_volume", "attention_volume", "attn_volume" -> {
+                    payload.toFloatOrNull()?.let { vol ->
+                        onStateUpdate { copy(attentionSoundVolume = vol) }
                     }
                 }
                 "gaze_marker", "show_gaze_marker" -> {

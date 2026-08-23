@@ -120,11 +120,13 @@ data class ControlState(
     val gazeMarkerOpacity: Float = 0.8f,
     val gazeMarkerColor: String = "CYAN",
 
-    // Get Attention Rainbow Boundary Band
+    // Get Attention Rainbow Boundary Band & Audio Stimulation
     val isAttentionActive: Boolean = false,
     val attentionDurationSec: Float = 4.0f,
     val attentionOpacity: Float = 0.85f,
     val attentionBandWidthDp: Float = 36.0f,
+    val attentionSoundEnabled: Boolean = true,
+    val attentionSoundVolume: Float = 0.85f,
     val attentionTriggerTimestamp: Long = 0L,
     val attentionRemainingTimeSec: Float = 0.0f,
     

@@ -252,7 +252,10 @@ fun ParentDashboardScreen(
                 }
             }
 
-            // 3. Get Child Attention (Rainbow Boundary Band)
+            // 3. Get Child Attention (Rainbow Boundary Band & Audio Stimulation)
+            val isAttnActive = state.isAttentionActive || state.attentionRemainingTimeSec > 0f
+            val attnButtonColor = if (isAttnActive) Color(0xFFFF6D00) else Color(0xFF7C4DFF)
+
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -277,16 +280,20 @@ fun ParentDashboardScreen(
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C4DFF)),
+                            colors = ButtonDefaults.buttonColors(containerColor = attnButtonColor),
                             contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp),
                             enabled = isOnline
                         ) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = "Get Attention", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("✨ GET ATTENTION ✨", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isAttnActive) "✨ ACTIVE (${"%.1f".format(state.attentionRemainingTimeSec)}s) ✨" else "✨ GET ATTENTION ✨",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
-                        if (state.isAttentionActive || state.attentionRemainingTimeSec > 0f) {
+                        if (isAttnActive) {
                             Button(
                                 onClick = {
                                     if (isOnline) {
@@ -314,31 +321,65 @@ fun ParentDashboardScreen(
                         }
                     }
 
-                    if (state.isAttentionActive || state.attentionRemainingTimeSec > 0f) {
-                        Badge(
-                            containerColor = Color(0xFF9C27B0),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "🌈 Rotating Rainbow Band Active (${"%.1f".format(state.attentionRemainingTimeSec)}s remaining)",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    // Foldable Sliders Section
+                    // Foldable Options Section
                     AnimatedVisibility(
                         visible = isAttentionOptionsExpanded,
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
                         Column(
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
+                            // Audio Stimulation Sound Toggle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (state.attentionSoundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                        contentDescription = "Chime Sound",
+                                        tint = if (state.attentionSoundEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Stimulation Chime Sound", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                }
+                                Switch(
+                                    checked = state.attentionSoundEnabled,
+                                    onCheckedChange = { enabled ->
+                                        if (isOnline) {
+                                            mqttClient.sendCommand(state.topicPrefix, "attention_sound", enabled.toString())
+                                        }
+                                    },
+                                    enabled = isOnline,
+                                    modifier = Modifier.scale(0.8f)
+                                )
+                            }
+
+                            // Chime Volume Slider
+                            if (state.attentionSoundEnabled) {
+                                Column {
+                                    Text(
+                                        text = "Chime Volume: ${(state.attentionSoundVolume * 100).toInt()}%",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Slider(
+                                        value = state.attentionSoundVolume.coerceIn(0.1f, 1.0f),
+                                        onValueChange = { vol ->
+                                            if (isOnline) {
+                                                mqttClient.sendCommand(state.topicPrefix, "attention_sound_volume", "%.2f".format(vol))
+                                            }
+                                        },
+                                        enabled = isOnline,
+                                        valueRange = 0.1f..1.0f
+                                    )
+                                }
+                            }
+
                             // Duration Slider
                             Column {
                                 Text(
