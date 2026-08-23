@@ -37,7 +37,16 @@ fun SensoryScreen(
     val jellyfishRenderer = remember { VisualPatternRenderer() }
     val bubbleRenderer = remember { BubbleBloomRenderer() }
     val attentionRenderer = remember { AttentionBandRenderer() }
-    var lastFrameTime by remember { mutableStateOf(System.nanoTime()) }
+    var animationTick by remember { mutableLongStateOf(0L) }
+    var lastFrameTime by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { time ->
+                animationTick = time
+            }
+        }
+    }
 
     LaunchedEffect(state.bubbleActionTrigger) {
         val trigger = state.bubbleActionTrigger ?: return@LaunchedEffect
@@ -72,8 +81,8 @@ fun SensoryScreen(
     ) {
         // 1. Visual Pattern Canvas Rendering
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val currentTime = System.nanoTime()
-            val deltaTime = ((currentTime - lastFrameTime) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
+            val currentTime = animationTick
+            val deltaTime = if (lastFrameTime == 0L || currentTime == 0L) 0.016f else ((currentTime - lastFrameTime) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
             lastFrameTime = currentTime
 
             when (state.activePattern) {
@@ -118,6 +127,17 @@ fun SensoryScreen(
 
             // 2. Rotating Rainbow Attention Boundary Band (Overlaid across entire perimeter)
             attentionRenderer.render(this, state, deltaTime)
+
+            val isRunning = attentionRenderer.isRunning
+            val remSec = attentionRenderer.remainingSeconds
+            if (state.isAttentionActive != isRunning) {
+                onStateChange {
+                    copy(
+                        isAttentionActive = isRunning,
+                        attentionRemainingTimeSec = remSec
+                    )
+                }
+            }
         }
 
         // 2. Real-Time Camera Preview Box (Top-Right Corner, permanently mounted to prevent CameraX surface reset)

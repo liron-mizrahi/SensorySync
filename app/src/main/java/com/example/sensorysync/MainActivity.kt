@@ -44,11 +44,6 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setupImmersiveFullScreen()
 
-        // 2. Start Android Kiosk Lock Task Mode (Pins screen, disables bottom swipe gestures & home/back buttons)
-        try {
-            startLockTask()
-        } catch (_: Exception) {}
-
         // 3. Initialize Analytics
         analyticsTracker = AnalyticsTracker(this) { updatedMetrics ->
             controlState = controlState.copy(engagementMetrics = updatedMetrics)

@@ -26,6 +26,7 @@ class AttentionBandRenderer {
     fun trigger(durationSec: Float) {
         activeDurationSec = durationSec.coerceIn(1f, 30f)
         activeRemainingSec = activeDurationSec
+        animTime = 0f
     }
 
     fun stop() {
@@ -33,21 +34,19 @@ class AttentionBandRenderer {
     }
 
     fun render(drawScope: DrawScope, state: ControlState, frameDeltaTime: Float) {
-        // Check for new trigger timestamp from MQTT/state
-        if (state.attentionTriggerTimestamp != lastTriggerTimestamp) {
+        // Check for trigger timestamp from state
+        if (state.attentionTriggerTimestamp != lastTriggerTimestamp && state.attentionTriggerTimestamp > 0L) {
             lastTriggerTimestamp = state.attentionTriggerTimestamp
-            if (state.isAttentionActive || state.attentionTriggerTimestamp > 0L) {
-                trigger(state.attentionDurationSec)
-            } else {
-                stop()
-            }
+            trigger(state.attentionDurationSec)
+        } else if (!state.isAttentionActive && activeRemainingSec > 0f && state.attentionTriggerTimestamp == 0L) {
+            stop()
         }
 
         if (activeRemainingSec <= 0f) return
 
         val dt = frameDeltaTime.coerceIn(0.001f, 0.05f)
         activeRemainingSec -= dt
-        animTime += dt * 2.2f // Rotation speed
+        animTime += dt * 3.5f // Rotation speed
 
         if (activeRemainingSec <= 0f) {
             activeRemainingSec = 0f
@@ -58,51 +57,35 @@ class AttentionBandRenderer {
         val h = drawScope.size.height
         val density = drawScope.density
 
-        // Compute fade-in (0 -> 0.3s) and fade-out (last 0.5s) envelope
+        // Compute fade-in (first 0.2s) and fade-out (last 0.3s)
         val elapsed = activeDurationSec - activeRemainingSec
-        val fadeIn = (elapsed / 0.3f).coerceIn(0f, 1f)
-        val fadeOut = (activeRemainingSec / 0.5f).coerceIn(0f, 1f)
+        val fadeIn = (elapsed / 0.2f).coerceIn(0f, 1f)
+        val fadeOut = (activeRemainingSec / 0.3f).coerceIn(0f, 1f)
         val envelope = fadeIn * fadeOut
 
-        val baseOpacity = state.attentionOpacity.coerceIn(0.1f, 1.0f) * envelope
-        val bandWidth = (state.attentionBandWidthDp * density).coerceIn(12f, 240f)
+        val baseOpacity = (state.attentionOpacity.coerceIn(0.1f, 1.0f) * envelope).coerceIn(0f, 1f)
+        val bandWidth = (state.attentionBandWidthDp * density).coerceIn(16f, 320f)
 
         // 1. Generate 12-Stop Rotating Rainbow Spectrum
-        val basePhase = (animTime * 60f) % 360f
+        val basePhase = (animTime * 90f) % 360f
         val rainbowColors = List(12) { i ->
             val hue = (basePhase + (i * 30f)) % 360f
-            hsvToColor(hue, 1.0f, 1.0f, baseOpacity)
+            Color.hsv(hue, 1.0f, 1.0f, baseOpacity)
         }
 
         // 2. Multi-stop Linear Gradient Perimeter Borders
-        val topBrush = Brush.horizontalGradient(
-            colors = rainbowColors,
-            startX = 0f,
-            endX = w
-        )
-        val bottomBrush = Brush.horizontalGradient(
-            colors = rainbowColors.reversed(),
-            startX = 0f,
-            endX = w
-        )
-        val leftBrush = Brush.verticalGradient(
-            colors = rainbowColors.reversed(),
-            startY = 0f,
-            endY = h
-        )
-        val rightBrush = Brush.verticalGradient(
-            colors = rainbowColors,
-            startY = 0f,
-            endY = h
-        )
+        val topBrush = Brush.horizontalGradient(colors = rainbowColors, startX = 0f, endX = w)
+        val bottomBrush = Brush.horizontalGradient(colors = rainbowColors.reversed(), startX = 0f, endX = w)
+        val leftBrush = Brush.verticalGradient(colors = rainbowColors.reversed(), startY = 0f, endY = h)
+        val rightBrush = Brush.verticalGradient(colors = rainbowColors, startY = 0f, endY = h)
 
         // A. Soft Inward Bloom Glow (Feathered Aura)
-        val glowWidth = bandWidth * 1.6f
+        val glowWidth = bandWidth * 1.8f
 
         // Top Inward Glow
         drawScope.drawRect(
             brush = Brush.verticalGradient(
-                colors = listOf(rainbowColors[0].copy(alpha = baseOpacity * 0.45f), Color.Transparent),
+                colors = listOf(rainbowColors[0].copy(alpha = baseOpacity * 0.6f), Color.Transparent),
                 startY = 0f,
                 endY = glowWidth
             ),
@@ -113,7 +96,7 @@ class AttentionBandRenderer {
         // Bottom Inward Glow
         drawScope.drawRect(
             brush = Brush.verticalGradient(
-                colors = listOf(Color.Transparent, rainbowColors[6].copy(alpha = baseOpacity * 0.45f)),
+                colors = listOf(Color.Transparent, rainbowColors[6].copy(alpha = baseOpacity * 0.6f)),
                 startY = h - glowWidth,
                 endY = h
             ),
@@ -124,7 +107,7 @@ class AttentionBandRenderer {
         // Left Inward Glow
         drawScope.drawRect(
             brush = Brush.horizontalGradient(
-                colors = listOf(rainbowColors[9].copy(alpha = baseOpacity * 0.45f), Color.Transparent),
+                colors = listOf(rainbowColors[9].copy(alpha = baseOpacity * 0.6f), Color.Transparent),
                 startX = 0f,
                 endX = glowWidth
             ),
@@ -135,7 +118,7 @@ class AttentionBandRenderer {
         // Right Inward Glow
         drawScope.drawRect(
             brush = Brush.horizontalGradient(
-                colors = listOf(Color.Transparent, rainbowColors[3].copy(alpha = baseOpacity * 0.45f)),
+                colors = listOf(Color.Transparent, rainbowColors[3].copy(alpha = baseOpacity * 0.6f)),
                 startX = w - glowWidth,
                 endX = w
             ),
@@ -144,45 +127,25 @@ class AttentionBandRenderer {
         )
 
         // B. Core Solid Vibrant Border Bars
-        // Top border
-        drawScope.drawRect(
-            brush = topBrush,
-            topLeft = Offset(0f, 0f),
-            size = Size(w, bandWidth)
-        )
-        // Bottom border
-        drawScope.drawRect(
-            brush = bottomBrush,
-            topLeft = Offset(0f, h - bandWidth),
-            size = Size(w, bandWidth)
-        )
-        // Left border
-        drawScope.drawRect(
-            brush = leftBrush,
-            topLeft = Offset(0f, 0f),
-            size = Size(bandWidth, h)
-        )
-        // Right border
-        drawScope.drawRect(
-            brush = rightBrush,
-            topLeft = Offset(w - bandWidth, 0f),
-            size = Size(bandWidth, h)
-        )
+        drawScope.drawRect(brush = topBrush, topLeft = Offset(0f, 0f), size = Size(w, bandWidth))
+        drawScope.drawRect(brush = bottomBrush, topLeft = Offset(0f, h - bandWidth), size = Size(w, bandWidth))
+        drawScope.drawRect(brush = leftBrush, topLeft = Offset(0f, 0f), size = Size(bandWidth, h))
+        drawScope.drawRect(brush = rightBrush, topLeft = Offset(w - bandWidth, 0f), size = Size(bandWidth, h))
 
-        // C. Crisp Inner Holographic Border Line
-        val innerLineColor = Color.White.copy(alpha = 0.85f * baseOpacity)
+        // C. Crisp Inner White Holographic Accent Line
+        val innerLineColor = Color.White.copy(alpha = 0.9f * baseOpacity)
         drawScope.drawRect(
             color = innerLineColor,
             topLeft = Offset(bandWidth, bandWidth),
             size = Size(w - 2 * bandWidth, h - 2 * bandWidth),
-            style = Stroke(width = 2.5f)
+            style = Stroke(width = 3.5f)
         )
 
         // D. 4 Corner Rotating Prismatic Shimmer Stars
-        renderCornerShimmer(drawScope, bandWidth * 0.8f, bandWidth * 0.8f, animTime, baseOpacity)
-        renderCornerShimmer(drawScope, w - bandWidth * 0.8f, bandWidth * 0.8f, animTime + 1f, baseOpacity)
-        renderCornerShimmer(drawScope, w - bandWidth * 0.8f, h - bandWidth * 0.8f, animTime + 2f, baseOpacity)
-        renderCornerShimmer(drawScope, bandWidth * 0.8f, h - bandWidth * 0.8f, animTime + 3f, baseOpacity)
+        renderCornerShimmer(drawScope, bandWidth * 0.9f, bandWidth * 0.9f, animTime, baseOpacity)
+        renderCornerShimmer(drawScope, w - bandWidth * 0.9f, bandWidth * 0.9f, animTime + 1f, baseOpacity)
+        renderCornerShimmer(drawScope, w - bandWidth * 0.9f, h - bandWidth * 0.9f, animTime + 2f, baseOpacity)
+        renderCornerShimmer(drawScope, bandWidth * 0.9f, h - bandWidth * 0.9f, animTime + 3f, baseOpacity)
     }
 
     private fun renderCornerShimmer(
@@ -192,8 +155,8 @@ class AttentionBandRenderer {
         time: Float,
         opacity: Float
     ) {
-        val pulse = (sin(time * 6f) * 0.3f + 0.7f).toFloat()
-        val starRadius = 18f * pulse
+        val pulse = (sin(time * 6f) * 0.3f + 0.7f)
+        val starRadius = 24f * pulse
         val starColor = Color.White.copy(alpha = 0.95f * opacity)
 
         drawScope.drawCircle(
@@ -203,11 +166,10 @@ class AttentionBandRenderer {
         )
         drawScope.drawCircle(
             color = starColor,
-            radius = 3.5f * pulse,
+            radius = 4.0f * pulse,
             center = Offset(cx, cy)
         )
 
-        // 4-point cross star
         for (a in 0..3) {
             val angle = (time * 1.5f + (a * PI.toFloat() / 2f))
             val ex = cx + cos(angle) * starRadius
@@ -216,31 +178,8 @@ class AttentionBandRenderer {
                 color = starColor,
                 start = Offset(cx, cy),
                 end = Offset(ex, ey),
-                strokeWidth = 2.0f
+                strokeWidth = 2.5f
             )
         }
-    }
-
-    private fun hsvToColor(hue: Float, saturation: Float, value: Float, alpha: Float): Color {
-        val c = value * saturation
-        val hPrime = (hue % 360f) / 60f
-        val x = c * (1f - kotlin.math.abs((hPrime % 2f) - 1f))
-        val m = value - c
-
-        val (r1, g1, b1) = when {
-            hPrime < 1f -> Triple(c, x, 0f)
-            hPrime < 2f -> Triple(x, c, 0f)
-            hPrime < 3f -> Triple(0f, c, x)
-            hPrime < 4f -> Triple(0f, x, c)
-            hPrime < 5f -> Triple(x, 0f, c)
-            else -> Triple(c, 0f, x)
-        }
-
-        return Color(
-            red = (r1 + m).coerceIn(0f, 1f),
-            green = (g1 + m).coerceIn(0f, 1f),
-            blue = (b1 + m).coerceIn(0f, 1f),
-            alpha = alpha.coerceIn(0f, 1f)
-        )
     }
 }
