@@ -75,6 +75,10 @@ class VisionManager(
     @Volatile
     private var lastSnapshotTimeMs: Long = 0L
 
+    // EMA smoothed gaze coordinates
+    private var smoothedGazeX: Float = 0.5f
+    private var smoothedGazeY: Float = 0.5f
+
     // Paints for MediaPipe visual landmark overlay
     private val boxPaint = Paint().apply {
         style = Paint.Style.STROKE
@@ -95,9 +99,10 @@ class VisionManager(
 
     init {
         val faceOptions = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+            .setMinFaceSize(0.12f)
             .enableTracking()
             .build()
         faceDetector = FaceDetection.getClient(faceOptions)
@@ -121,6 +126,12 @@ class VisionManager(
                 boundingBoxAspectRatio = prefs.getFloat("aspect_ratio", 1f)
             )
         }
+    }
+
+    fun clearSavedFaceProfile() {
+        savedFingerprint = null
+        lockedFaceId = null
+        prefs.edit().clear().apply()
     }
 
     fun setLockedFaceId(faceId: Int?) {
@@ -366,53 +377,98 @@ class VisionManager(
         if (faces.isEmpty()) return Triple(EyeGazeData(isFaceDetected = false), null, false)
 
         var isAutoMatched = false
-        var targetId = lockedFaceId
+        var selectedFace: Face? = null
 
-        if (targetId == null && savedFingerprint != null) {
-            val targetFp = savedFingerprint!!
-            var bestDist = Float.MAX_VALUE
-            var bestFace: Face? = null
+        // 1. If only 1 face is present in the frame, always track it directly! (100% reliable for 1-on-1 child sessions)
+        if (faces.size == 1) {
+            selectedFace = faces.first()
+            if (lockedFaceId != null && selectedFace.trackingId != lockedFaceId) {
+                // Self-heal: update lockedFaceId to this single face in frame
+                lockedFaceId = selectedFace.trackingId
+            }
+        } else {
+            // 2. Multiple faces in frame:
+            // A. Try to find the currently locked tracking ID
+            if (lockedFaceId != null) {
+                selectedFace = faces.firstOrNull { it.trackingId == lockedFaceId }
+            }
 
-            for (f in faces) {
-                val fp = extractFingerprint(f)
-                val dist = computeDistance(fp, targetFp)
-                if (dist < 0.28f && dist < bestDist) {
-                    bestDist = dist
-                    bestFace = f
+            // B. If not locked or ID changed, match against saved fingerprint with relaxed threshold (0.60)
+            if (selectedFace == null && savedFingerprint != null) {
+                val targetFp = savedFingerprint!!
+                var bestDist = Float.MAX_VALUE
+                var bestCandidate: Face? = null
+
+                for (f in faces) {
+                    val fp = extractFingerprint(f)
+                    val dist = computeDistance(fp, targetFp)
+                    if (dist < 0.60f && dist < bestDist) {
+                        bestDist = dist
+                        bestCandidate = f
+                    }
+                }
+
+                if (bestCandidate != null && bestCandidate.trackingId != null) {
+                    selectedFace = bestCandidate
+                    lockedFaceId = selectedFace.trackingId
+                    isAutoMatched = true
                 }
             }
 
-            if (bestFace != null && bestFace.trackingId != null) {
-                targetId = bestFace.trackingId
-                lockedFaceId = targetId
-                isAutoMatched = true
+            // C. Fallback: Select the primary face closest to the center/largest in frame (the child holding/viewing tablet)
+            if (selectedFace == null) {
+                selectedFace = faces.maxByOrNull { f ->
+                    val b = f.boundingBox
+                    val area = b.width() * b.height()
+                    val distFromCenter = hypot(b.centerX() - imgW / 2f, b.centerY() - imgH / 2f)
+                    area - (distFromCenter * 60f)
+                } ?: faces.first()
             }
         }
 
-        val face = if (targetId != null) {
-            faces.firstOrNull { it.trackingId == targetId }
-        } else {
-            faces.firstOrNull()
-        }
-
-        if (face == null) {
-            return Triple(EyeGazeData(isFaceDetected = false), faces.firstOrNull()?.trackingId, false)
-        }
+        val face = selectedFace ?: return Triple(EyeGazeData(isFaceDetected = false), null, false)
 
         val bounds = face.boundingBox
-        val normX = 1.0f - (bounds.centerX() / imgW).coerceIn(0f, 1f)
-        val normY = (bounds.centerY() / imgH).coerceIn(0f, 1f)
+        val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
+        val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position
+
+        // Calculate base coordinate from eye midpoint if available, else bounding box center
+        val eyeCenterNormX: Float
+        val eyeCenterNormY: Float
+        if (leftEye != null && rightEye != null) {
+            val midX = (leftEye.x + rightEye.x) / 2f
+            val midY = (leftEye.y + rightEye.y) / 2f
+            eyeCenterNormX = 1.0f - (midX / imgW).coerceIn(0f, 1f) // mirror for front camera
+            eyeCenterNormY = (midY / imgH).coerceIn(0f, 1f)
+        } else {
+            eyeCenterNormX = 1.0f - (bounds.centerX() / imgW).coerceIn(0f, 1f)
+            eyeCenterNormY = (bounds.centerY() / imgH).coerceIn(0f, 1f)
+        }
+
+        // Apply head orientation shift for natural gaze parallax
+        val headYaw = face.headEulerAngleY // degrees: negative = looking left, positive = looking right
+        val headPitch = face.headEulerAngleX // degrees: positive = looking up, negative = looking down
+
+        val yawShift = (-headYaw / 45f) * 0.18f // map +/- 45 deg to +/- 18% screen shift
+        val pitchShift = (-headPitch / 40f) * 0.14f // map +/- 40 deg to +/- 14% screen shift
+
+        val rawX = (eyeCenterNormX + yawShift).coerceIn(0.02f, 0.98f)
+        val rawY = (eyeCenterNormY + pitchShift).coerceIn(0.02f, 0.98f)
+
+        // Smooth with Exponential Moving Average (EMA) to eliminate frame jitter
+        smoothedGazeX = smoothedGazeX * 0.65f + rawX * 0.35f
+        smoothedGazeY = smoothedGazeY * 0.65f + rawY * 0.35f
 
         val leftEyeOpen = face.leftEyeOpenProbability ?: 1.0f
         val rightEyeOpen = face.rightEyeOpenProbability ?: 1.0f
         val isBlinking = leftEyeOpen < 0.2f && rightEyeOpen < 0.2f
 
-        val rawOffset = Offset(normX, normY)
+        val smoothedOffset = Offset(smoothedGazeX, smoothedGazeY)
 
         val eyeData = EyeGazeData(
             isFaceDetected = true,
-            gazePosition = rawOffset,
-            calibratedGazePosition = rawOffset,
+            gazePosition = smoothedOffset,
+            calibratedGazePosition = smoothedOffset,
             leftEyeOpenProb = leftEyeOpen,
             rightEyeOpenProb = rightEyeOpen,
             isBlinking = isBlinking,

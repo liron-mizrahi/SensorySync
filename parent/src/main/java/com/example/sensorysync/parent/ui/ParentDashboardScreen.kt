@@ -420,6 +420,18 @@ fun ParentDashboardScreen(
                                 Text("Release", fontSize = 11.sp)
                             }
                         }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "command", "CLEAR_FACE_PROFILE")
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            enabled = isOnline
+                        ) {
+                            Text("Clear", fontSize = 11.sp)
+                        }
                     }
                 }
             }

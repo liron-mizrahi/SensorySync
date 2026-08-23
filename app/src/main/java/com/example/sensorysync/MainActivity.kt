@@ -63,6 +63,9 @@ class MainActivity : ComponentActivity() {
                 analyticsTracker.updateState(newState)
 
                 if (::visionManager.isInitialized) {
+                    if (newState.shouldClearFaceProfile) {
+                        visionManager.clearSavedFaceProfile()
+                    }
                     visionManager.setLockedFaceId(if (newState.isFaceLocked) newState.targetFaceTrackingId else null)
                 }
 

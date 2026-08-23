@@ -98,6 +98,7 @@ data class ControlState(
     val isFaceLocked: Boolean = false,
     val targetFaceTrackingId: Int? = null,
     val targetFaceStatusText: String = "Searching...",
+    val shouldClearFaceProfile: Boolean = false,
     
     // Child Touch Lockdown & Safety Exit
     val isTouchLocked: Boolean = true,

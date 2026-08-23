@@ -151,6 +151,14 @@ class MqttController(
                                 targetFaceStatusText = "Unlocked"
                             )
                         }
+                        "CLEAR_FACE_PROFILE", "RESET_FACE_PROFILE", "CLEAR_FACE" -> {
+                            copy(
+                                isFaceLocked = false,
+                                targetFaceTrackingId = null,
+                                targetFaceStatusText = "Profile Cleared",
+                                shouldClearFaceProfile = true
+                            )
+                        }
                         "CAMERA_PREVIEW_ON" -> copy(showCameraPreview = true)
                         "CAMERA_PREVIEW_OFF" -> copy(showCameraPreview = false)
                         "CAMERA_PREVIEW_TOGGLE" -> copy(showCameraPreview = !showCameraPreview)
