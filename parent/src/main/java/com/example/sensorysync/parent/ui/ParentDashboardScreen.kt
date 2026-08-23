@@ -212,7 +212,13 @@ fun ParentDashboardScreen(
                         }
                     }
 
-                    Text("Active Visual: 🪼 Cosmic Jellyfish (Gaze-Contingent Tracking)", fontSize = 12.sp, color = Color(0xFF00BCD4), fontWeight = FontWeight.Medium)
+                    val isBubbleMode = (state.activePatternId == 2)
+                    Text(
+                        text = if (isBubbleMode) "Active Visual: 🫧 Bubble Bloom (Gaze-Contingent Pop)" else "Active Visual: 🪼 Cosmic Jellyfish (Gaze-Contingent Tracking)",
+                        fontSize = 12.sp,
+                        color = Color(0xFF00BCD4),
+                        fontWeight = FontWeight.Medium
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -228,7 +234,7 @@ fun ParentDashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Jellyfish Focus Time:",
+                                text = if (isBubbleMode) "Target Focus Time:" else "Jellyfish Focus Time:",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
