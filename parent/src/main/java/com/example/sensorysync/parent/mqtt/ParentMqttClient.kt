@@ -196,6 +196,69 @@ class ParentMqttClient(
     }
 
     fun sendCommand(topicPrefix: String, subTopic: String, payload: String) {
+        // Optimistic local state update for instantaneous slider/switch responsiveness
+        try {
+            when (subTopic) {
+                "gaze_marker", "show_gaze_marker" -> {
+                    val show = payload.toBooleanStrictOrNull() ?: (payload == "1" || payload.equals("true", ignoreCase = true))
+                    onStateUpdate { copy(showGazeMarker = show) }
+                }
+                "gaze_marker_size", "marker_size" -> {
+                    payload.toFloatOrNull()?.let { size ->
+                        onStateUpdate { copy(gazeMarkerSize = size) }
+                    }
+                }
+                "gaze_marker_opacity", "marker_opacity" -> {
+                    payload.toFloatOrNull()?.let { opacity ->
+                        onStateUpdate { copy(gazeMarkerOpacity = opacity) }
+                    }
+                }
+                "gaze_marker_color", "marker_color" -> {
+                    onStateUpdate { copy(gazeMarkerColor = payload.uppercase()) }
+                }
+                "pattern" -> {
+                    payload.toIntOrNull()?.let { pId ->
+                        onStateUpdate { copy(activePatternId = pId) }
+                    }
+                }
+                "bubble_count" -> {
+                    payload.toIntOrNull()?.let { count ->
+                        onStateUpdate { copy(bubbleCount = count) }
+                    }
+                }
+                "bubble_scale" -> {
+                    payload.toFloatOrNull()?.let { scale ->
+                        onStateUpdate { copy(bubbleScale = scale) }
+                    }
+                }
+                "speed" -> {
+                    payload.toFloatOrNull()?.let { spd ->
+                        onStateUpdate { copy(speedMultiplier = spd) }
+                    }
+                }
+                "bubble_dwell_time" -> {
+                    payload.toFloatOrNull()?.let { dwell ->
+                        onStateUpdate { copy(bubbleDwellTimeSec = dwell) }
+                    }
+                }
+                "jellyfish_scale", "size" -> {
+                    payload.toFloatOrNull()?.let { scale ->
+                        onStateUpdate { copy(jellyfishScale = scale) }
+                    }
+                }
+                "strobe_freq" -> {
+                    payload.toFloatOrNull()?.let { freq ->
+                        onStateUpdate { copy(strobeFrequencyHz = freq) }
+                    }
+                }
+                "color_hue" -> {
+                    payload.toFloatOrNull()?.let { hue ->
+                        onStateUpdate { copy(primaryHue = hue) }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
         if (mqttClient?.isConnected != true) return
         try {
             val fullTopic = "$topicPrefix/$subTopic"

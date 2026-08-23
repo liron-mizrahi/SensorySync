@@ -107,37 +107,6 @@ fun SensoryScreen(
                     }
                 }
             }
-
-            if (state.showDebugOverlay) {
-                val width = size.width
-                val height = size.height
-
-                if (state.gazeData.isFaceDetected) {
-                    val gx = state.gazeData.gazePosition.x * width
-                    val gy = state.gazeData.gazePosition.y * height
-
-                    val crosshairColor = if (state.isFaceLocked) Color(0xFF4CAF50) else Color.Cyan
-
-                    drawCircle(
-                        color = crosshairColor.copy(alpha = 0.8f),
-                        radius = 24f,
-                        center = Offset(gx, gy),
-                        style = Stroke(width = 3f)
-                    )
-                    drawLine(
-                        color = crosshairColor.copy(alpha = 0.8f),
-                        start = Offset(gx - 36f, gy),
-                        end = Offset(gx + 36f, gy),
-                        strokeWidth = 2f
-                    )
-                    drawLine(
-                        color = crosshairColor.copy(alpha = 0.8f),
-                        start = Offset(gx, gy - 36f),
-                        end = Offset(gx, gy + 36f),
-                        strokeWidth = 2f
-                    )
-                }
-            }
         }
 
         // 2. Real-Time Camera Preview Box (Top-Right Corner, permanently mounted to prevent CameraX surface reset)

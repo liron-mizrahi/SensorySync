@@ -724,48 +724,63 @@ class VisualPatternRenderer {
             else -> Color(0xFF00E5FF) // CYAN
         }
 
-        val reticleColor = if (isFocused) Color(0xFF00E676) else baseColor
-        val radius = (if (isFocused) 6.5f else 4.2f) * markerScale
+        val primaryColor = if (state.isFaceLocked) Color(0xFF00E676) else baseColor
+        val ringRadius = (if (isFocused) 18f else 13f) * markerScale
 
+        // 1. Soft Outer Glowing Aura
         drawScope.drawCircle(
-            color = reticleColor.copy(alpha = (if (isFocused) 0.65f else 0.35f) * markerOpacity),
-            radius = radius + (3.0f * markerScale),
-            center = Offset(gazeX, gazeY),
-            style = Stroke(width = 1.0f * markerScale)
-        )
-
-        drawScope.drawCircle(
-            color = reticleColor.copy(alpha = 0.98f * markerOpacity),
-            radius = (if (isFocused) 2.0f else 1.3f) * markerScale,
+            color = (if (isFocused) Color(0xFF69F0AE) else primaryColor).copy(alpha = 0.25f * markerOpacity),
+            radius = ringRadius + (8f * markerScale),
             center = Offset(gazeX, gazeY)
         )
 
-        val tickLen = 2.5f * markerScale
-        val strokeW = 1.0f * markerScale
-        val tickAlpha = 0.85f * markerOpacity
+        // 2. Main Target Ring
+        drawScope.drawCircle(
+            color = primaryColor.copy(alpha = (if (isFocused) 0.90f else 0.65f) * markerOpacity),
+            radius = ringRadius,
+            center = Offset(gazeX, gazeY),
+            style = Stroke(width = (if (isFocused) 2.5f else 1.8f) * markerScale)
+        )
 
+        // 3. Center Solid Focal Pip
+        drawScope.drawCircle(
+            color = (if (isFocused) Color.White else primaryColor).copy(alpha = 0.95f * markerOpacity),
+            radius = (if (isFocused) 4.0f else 3.0f) * markerScale,
+            center = Offset(gazeX, gazeY)
+        )
+
+        // 4. Crosshair Ticks
+        val tickLen = 7f * markerScale
+        val strokeW = 1.8f * markerScale
+        val tickAlpha = 0.85f * markerOpacity
+        val tickColor = primaryColor.copy(alpha = tickAlpha)
+
+        // Left tick
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = tickAlpha),
-            start = Offset(gazeX - radius - tickLen, gazeY),
-            end = Offset(gazeX - radius + (1f * markerScale), gazeY),
+            color = tickColor,
+            start = Offset(gazeX - ringRadius - tickLen, gazeY),
+            end = Offset(gazeX - ringRadius + (1.5f * markerScale), gazeY),
             strokeWidth = strokeW
         )
+        // Right tick
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = tickAlpha),
-            start = Offset(gazeX + radius - (1f * markerScale), gazeY),
-            end = Offset(gazeX + radius + tickLen, gazeY),
+            color = tickColor,
+            start = Offset(gazeX + ringRadius - (1.5f * markerScale), gazeY),
+            end = Offset(gazeX + ringRadius + tickLen, gazeY),
             strokeWidth = strokeW
         )
+        // Top tick
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = tickAlpha),
-            start = Offset(gazeX, gazeY - radius - tickLen),
-            end = Offset(gazeX, gazeY - radius + (1f * markerScale)),
+            color = tickColor,
+            start = Offset(gazeX, gazeY - ringRadius - tickLen),
+            end = Offset(gazeX, gazeY - ringRadius + (1.5f * markerScale)),
             strokeWidth = strokeW
         )
+        // Bottom tick
         drawScope.drawLine(
-            color = reticleColor.copy(alpha = tickAlpha),
-            start = Offset(gazeX, gazeY + radius - (1f * markerScale)),
-            end = Offset(gazeX, gazeY + radius + tickLen),
+            color = tickColor,
+            start = Offset(gazeX, gazeY + ringRadius - (1.5f * markerScale)),
+            end = Offset(gazeX, gazeY + ringRadius + tickLen),
             strokeWidth = strokeW
         )
     }
