@@ -126,12 +126,37 @@ class MqttController(
                     copy(gazeMarkerColor = value.uppercase())
                 }
 
+                "attention_duration", "attn_duration" -> {
+                    val dur = value.toFloatOrNull()?.coerceIn(1.0f, 15.0f) ?: attentionDurationSec
+                    copy(attentionDurationSec = dur)
+                }
+                "attention_opacity", "attn_opacity" -> {
+                    val op = value.toFloatOrNull()?.coerceIn(0.1f, 1.0f) ?: attentionOpacity
+                    copy(attentionOpacity = op)
+                }
+                "attention_band_width", "attn_width", "band_width" -> {
+                    val bw = value.toFloatOrNull()?.coerceIn(10.0f, 80.0f) ?: attentionBandWidthDp
+                    copy(attentionBandWidthDp = bw)
+                }
+
                 "camera_preview" -> {
                     val show = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
                     copy(showCameraPreview = show)
                 }
                 "command" -> {
                     when (value.uppercase()) {
+                        "GET_ATTENTION", "START_ATTENTION", "TRIGGER_ATTENTION" -> {
+                            copy(
+                                isAttentionActive = true,
+                                attentionTriggerTimestamp = System.currentTimeMillis()
+                            )
+                        }
+                        "STOP_ATTENTION", "CANCEL_ATTENTION" -> {
+                            copy(
+                                isAttentionActive = false,
+                                attentionTriggerTimestamp = 0L
+                            )
+                        }
                         "ACQUIRE_FACE", "LOCK_FACE" -> {
                             val currentId = gazeData.faceTrackingId
                             if (currentId != null) {
@@ -218,6 +243,11 @@ class MqttController(
                 put("gazeMarkerSize", state.gazeMarkerSize)
                 put("gazeMarkerOpacity", state.gazeMarkerOpacity)
                 put("gazeMarkerColor", state.gazeMarkerColor)
+                put("isAttentionActive", state.isAttentionActive)
+                put("attentionDurationSec", state.attentionDurationSec)
+                put("attentionOpacity", state.attentionOpacity)
+                put("attentionBandWidthDp", state.attentionBandWidthDp)
+                put("attentionRemainingTimeSec", state.attentionRemainingTimeSec)
                 put("jellyfishScale", state.jellyfishScale)
                 put("bubbleCount", state.bubbleCount)
                 put("bubbleScale", state.bubbleScale)

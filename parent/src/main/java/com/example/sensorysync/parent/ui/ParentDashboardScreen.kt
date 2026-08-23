@@ -767,7 +767,138 @@ fun ParentDashboardScreen(
                 }
             }
 
-            // 6. Eye Gaze Marker Controls & Customization
+            // 6. Get Attention Rainbow Boundary Band
+            Text(
+                text = "✨ Get Child Attention",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                modifier = Modifier.alpha(if (isOnline) 1.0f else 0.5f)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (isOnline) 1.0f else 0.5f),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Trigger & Stop Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "command", "GET_ATTENTION")
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C4DFF)),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            enabled = isOnline
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "Get Attention", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("✨ GET ATTENTION ✨", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        if (state.isAttentionActive || state.attentionRemainingTimeSec > 0f) {
+                            Button(
+                                onClick = {
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "command", "STOP_ATTENTION")
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                enabled = isOnline
+                            ) {
+                                Text("⏹️ Stop", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    if (state.isAttentionActive || state.attentionRemainingTimeSec > 0f) {
+                        Badge(
+                            containerColor = Color(0xFF9C27B0),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "🌈 Rotating Rainbow Band Active (${"%.1f".format(state.attentionRemainingTimeSec)}s remaining)",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    // Duration Slider
+                    Column {
+                        Text(
+                            text = "Band Duration: ${"%.1f".format(state.attentionDurationSec)}s",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Slider(
+                            value = state.attentionDurationSec.coerceIn(1.0f, 15.0f),
+                            onValueChange = { dur ->
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "attention_duration", "%.1f".format(dur))
+                                }
+                            },
+                            enabled = isOnline,
+                            valueRange = 1.0f..15.0f
+                        )
+                    }
+
+                    // Opacity Slider
+                    Column {
+                        Text(
+                            text = "Band Opacity: ${(state.attentionOpacity * 100).toInt()}%",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Slider(
+                            value = state.attentionOpacity.coerceIn(0.1f, 1.0f),
+                            onValueChange = { op ->
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "attention_opacity", "%.2f".format(op))
+                                }
+                            },
+                            enabled = isOnline,
+                            valueRange = 0.1f..1.0f
+                        )
+                    }
+
+                    // Band Width Slider
+                    Column {
+                        Text(
+                            text = "Band Width: ${state.attentionBandWidthDp.toInt()} dp",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Slider(
+                            value = state.attentionBandWidthDp.coerceIn(10.0f, 80.0f),
+                            onValueChange = { bw ->
+                                if (isOnline) {
+                                    mqttClient.sendCommand(state.topicPrefix, "attention_band_width", "%.0f".format(bw))
+                                }
+                            },
+                            enabled = isOnline,
+                            valueRange = 10.0f..80.0f
+                        )
+                    }
+                }
+            }
+
+            // 7. Eye Gaze Marker Controls & Customization
             Text(
                 text = "🎯 Eye Gaze Marker Controls",
                 fontWeight = FontWeight.Bold,

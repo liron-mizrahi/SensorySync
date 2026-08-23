@@ -60,7 +60,14 @@ data class ParentControlState(
     val showGazeMarker: Boolean = true,
     val gazeMarkerSize: Float = 1.0f,
     val gazeMarkerOpacity: Float = 0.8f,
-    val gazeMarkerColor: String = "CYAN"
+    val gazeMarkerColor: String = "CYAN",
+
+    // Get Attention Rainbow Boundary Band
+    val isAttentionActive: Boolean = false,
+    val attentionDurationSec: Float = 4.0f,
+    val attentionOpacity: Float = 0.85f,
+    val attentionBandWidthDp: Float = 36.0f,
+    val attentionRemainingTimeSec: Float = 0.0f
 )
 
 
@@ -179,6 +186,11 @@ class ParentMqttClient(
                     gazeMarkerSize = json.optDouble("gazeMarkerSize", 1.0).toFloat(),
                     gazeMarkerOpacity = json.optDouble("gazeMarkerOpacity", 0.8).toFloat(),
                     gazeMarkerColor = json.optString("gazeMarkerColor", "CYAN"),
+                    isAttentionActive = json.optBoolean("isAttentionActive", false),
+                    attentionDurationSec = json.optDouble("attentionDurationSec", 4.0).toFloat(),
+                    attentionOpacity = json.optDouble("attentionOpacity", 0.85).toFloat(),
+                    attentionBandWidthDp = json.optDouble("attentionBandWidthDp", 36.0).toFloat(),
+                    attentionRemainingTimeSec = json.optDouble("attentionRemainingTimeSec", 0.0).toFloat(),
                     jellyfishScale = json.optDouble("jellyfishScale", 0.5).toFloat(),
                     bubbleCount = json.optInt("bubbleCount", 12),
                     bubbleScale = json.optDouble("bubbleScale", 1.0).toFloat(),
@@ -199,6 +211,31 @@ class ParentMqttClient(
         // Optimistic local state update for instantaneous slider/switch responsiveness
         try {
             when (subTopic) {
+                "command" -> {
+                    when (payload.uppercase()) {
+                        "GET_ATTENTION", "START_ATTENTION", "TRIGGER_ATTENTION" -> {
+                            onStateUpdate { copy(isAttentionActive = true, attentionRemainingTimeSec = attentionDurationSec) }
+                        }
+                        "STOP_ATTENTION", "CANCEL_ATTENTION" -> {
+                            onStateUpdate { copy(isAttentionActive = false, attentionRemainingTimeSec = 0f) }
+                        }
+                    }
+                }
+                "attention_duration", "attn_duration" -> {
+                    payload.toFloatOrNull()?.let { dur ->
+                        onStateUpdate { copy(attentionDurationSec = dur) }
+                    }
+                }
+                "attention_opacity", "attn_opacity" -> {
+                    payload.toFloatOrNull()?.let { op ->
+                        onStateUpdate { copy(attentionOpacity = op) }
+                    }
+                }
+                "attention_band_width", "attn_width", "band_width" -> {
+                    payload.toFloatOrNull()?.let { bw ->
+                        onStateUpdate { copy(attentionBandWidthDp = bw) }
+                    }
+                }
                 "gaze_marker", "show_gaze_marker" -> {
                     val show = payload.toBooleanStrictOrNull() ?: (payload == "1" || payload.equals("true", ignoreCase = true))
                     onStateUpdate { copy(showGazeMarker = show) }

@@ -23,6 +23,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.view.PreviewView
 import com.example.sensorysync.model.ControlState
 import com.example.sensorysync.model.VisualPattern
+import com.example.sensorysync.visuals.AttentionBandRenderer
 import com.example.sensorysync.visuals.BubbleBloomRenderer
 import com.example.sensorysync.visuals.VisualPatternRenderer
 
@@ -35,6 +36,7 @@ fun SensoryScreen(
 ) {
     val jellyfishRenderer = remember { VisualPatternRenderer() }
     val bubbleRenderer = remember { BubbleBloomRenderer() }
+    val attentionRenderer = remember { AttentionBandRenderer() }
     var lastFrameTime by remember { mutableStateOf(System.nanoTime()) }
 
     LaunchedEffect(state.bubbleActionTrigger) {
@@ -43,6 +45,12 @@ fun SensoryScreen(
             trigger.startsWith("POP_RANDOM") -> bubbleRenderer.triggerPopRandom()
             trigger.startsWith("POP_ALL") -> bubbleRenderer.triggerPopAll()
             trigger.startsWith("RESET") -> bubbleRenderer.triggerResetBubbles()
+        }
+    }
+
+    LaunchedEffect(state.attentionTriggerTimestamp) {
+        if (state.attentionTriggerTimestamp > 0L) {
+            attentionRenderer.trigger(state.attentionDurationSec)
         }
     }
 
@@ -107,6 +115,9 @@ fun SensoryScreen(
                     }
                 }
             }
+
+            // 2. Rotating Rainbow Attention Boundary Band (Overlaid across entire perimeter)
+            attentionRenderer.render(this, state, deltaTime)
         }
 
         // 2. Real-Time Camera Preview Box (Top-Right Corner, permanently mounted to prevent CameraX surface reset)

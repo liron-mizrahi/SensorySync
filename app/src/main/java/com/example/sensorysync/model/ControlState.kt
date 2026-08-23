@@ -119,6 +119,14 @@ data class ControlState(
     val gazeMarkerSize: Float = 1.0f,
     val gazeMarkerOpacity: Float = 0.8f,
     val gazeMarkerColor: String = "CYAN",
+
+    // Get Attention Rainbow Boundary Band
+    val isAttentionActive: Boolean = false,
+    val attentionDurationSec: Float = 4.0f,
+    val attentionOpacity: Float = 0.85f,
+    val attentionBandWidthDp: Float = 36.0f,
+    val attentionTriggerTimestamp: Long = 0L,
+    val attentionRemainingTimeSec: Float = 0.0f,
     
     // MQTT Settings
     val mqttBroker: String = "192.168.1.96",
