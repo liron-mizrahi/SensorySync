@@ -125,6 +125,18 @@ class MqttController(
                 "gaze_marker_color", "marker_color" -> {
                     copy(gazeMarkerColor = value.uppercase())
                 }
+                "gaze_effect_radius", "gaze_radius", "effect_radius" -> {
+                    val radius = value.toFloatOrNull()?.coerceIn(24.0f, 240.0f) ?: gazeEffectRadiusDp
+                    copy(gazeEffectRadiusDp = radius)
+                }
+                "show_gaze_effect_radius", "show_effect_radius" -> {
+                    val show = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
+                    copy(showGazeEffectRadius = show)
+                }
+                "bubble_pop_sound", "bubble_pop_sound_enabled" -> {
+                    val enabled = value.toBooleanStrictOrNull() ?: (value == "1" || value.equals("true", ignoreCase = true))
+                    copy(bubblePopSoundEnabled = enabled)
+                }
 
                 "attention_duration", "attn_duration" -> {
                     val dur = value.toFloatOrNull()?.coerceIn(1.0f, 15.0f) ?: attentionDurationSec
@@ -251,6 +263,9 @@ class MqttController(
                 put("gazeMarkerSize", state.gazeMarkerSize)
                 put("gazeMarkerOpacity", state.gazeMarkerOpacity)
                 put("gazeMarkerColor", state.gazeMarkerColor)
+                put("gazeEffectRadiusDp", state.gazeEffectRadiusDp)
+                put("showGazeEffectRadius", state.showGazeEffectRadius)
+                put("bubblePopSoundEnabled", state.bubblePopSoundEnabled)
                 put("isAttentionActive", state.isAttentionActive)
                 put("attentionDurationSec", state.attentionDurationSec)
                 put("attentionOpacity", state.attentionOpacity)

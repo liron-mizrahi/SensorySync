@@ -80,6 +80,8 @@ class VisualPatternRenderer {
     var gazeJellyDistance = 1.0f
         private set
 
+    private val gazeMarkerRenderer = GazeMarkerRenderer()
+
     fun render(drawScope: DrawScope, state: ControlState, frameDeltaTime: Float) {
         val dt = frameDeltaTime.coerceIn(0.001f, 0.05f)
         animTime += dt * state.speedMultiplier
@@ -104,8 +106,12 @@ class VisualPatternRenderer {
         val dyNorm = (gazeNormY - jellyY) * (height / width.coerceAtLeast(1f))
         gazeJellyDistance = sqrt(dxNorm * dxNorm + dyNorm * dyNorm)
 
+        val density = drawScope.density
+        val minDim = min(width, height).coerceAtLeast(1f)
+        val effectRadiusNorm = (state.gazeEffectRadiusDp * density / minDim).coerceIn(0.04f, 0.45f)
+
         val isOnScreen = jellyX in -0.05f..1.05f && jellyY in -0.05f..1.05f
-        isCurrentlyFocused = isOnScreen && state.gazeData.isFaceDetected && gazeJellyDistance < 0.22f
+        isCurrentlyFocused = isOnScreen && state.gazeData.isFaceDetected && gazeJellyDistance < effectRadiusNorm
 
         // 3. Render Oceanic Atmospheric Vignette & Background Bokeh
         renderAtmosphericBackground(drawScope, width, height)
@@ -122,9 +128,9 @@ class VisualPatternRenderer {
         // 6. Render Foreground Floating Bokeh Orbs
         renderForegroundBokeh(drawScope, width, height)
 
-        // 7. Render Real-Time Eye Gaze Tracking Point (Scaled to 0.3x)
+        // 7. Render Real-Time Eye Gaze Tracking Point (Looking Around vs In Focus mode)
         if (state.gazeData.isFaceDetected && state.showGazeMarker) {
-            renderGazeReticleSmall(drawScope, state, gazePx, gazePy, isCurrentlyFocused)
+            gazeMarkerRenderer.render(drawScope, state, gazePx, gazePy, isCurrentlyFocused, dwellProgress = 0f, deltaTime = dt)
         }
     }
 

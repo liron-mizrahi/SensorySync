@@ -93,6 +93,11 @@ class BubbleBloomRenderer {
     var currentDwellProgress: Float = 0.0f
         private set
 
+    var onBubblePopped: ((pitchFactor: Float) -> Unit)? = null
+    private val gazeMarkerRenderer = GazeMarkerRenderer()
+    private var lastGazePx = 0f
+    private var lastGazePy = 0f
+
     @Volatile
     private var pendingPopRandom = false
     @Volatile
@@ -157,6 +162,8 @@ class BubbleBloomRenderer {
                 totalPoppedCount++
                 b.popRuptureAngle = ((Math.random() - 0.5) * 0.8).toFloat()
                 spawnPopShards(b, width, height, scale)
+                val pitch = (60f / b.baseRadius).coerceIn(0.80f, 1.40f)
+                onBubblePopped?.invoke(pitch)
                 return true
             }
         }
@@ -188,6 +195,8 @@ class BubbleBloomRenderer {
                 totalPoppedCount++
                 candidate.popRuptureAngle = ((Math.random() - 0.5) * 0.8).toFloat()
                 spawnPopShards(candidate, width, height, scale)
+                val pitch = (60f / candidate.baseRadius).coerceIn(0.80f, 1.40f)
+                onBubblePopped?.invoke(pitch)
             }
         }
 
@@ -200,6 +209,8 @@ class BubbleBloomRenderer {
                     totalPoppedCount++
                     b.popRuptureAngle = ((Math.random() - 0.5) * 0.8).toFloat()
                     spawnPopShards(b, width, height, scale)
+                    val pitch = (60f / b.baseRadius).coerceIn(0.80f, 1.40f)
+                    onBubblePopped?.invoke(pitch)
                 }
             }
         }
@@ -207,16 +218,28 @@ class BubbleBloomRenderer {
         // 1. Render Cosmic Nebula & Starfield
         renderCosmicBackground(drawScope, width, height)
 
-        // 2. Gaze Targeting Logic
+        // 2. Gaze Targeting Logic (Distinguish steady Focus from Looking Around)
         val gazeX = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.x else 0.5f
         val gazeY = if (state.gazeData.isFaceDetected) state.gazeData.gazePosition.y else 0.5f
         val gazePx = gazeX * width
         val gazePy = gazeY * height
 
+        val density = drawScope.density
+        val effectRadiusPx = (state.gazeEffectRadiusDp * density).coerceIn(24f, 400f)
+
+        // Track gaze movement velocity to distinguish looking around from steady focus
+        val gazeDistMoved = hypot(gazePx - lastGazePx, gazePy - lastGazePy)
+        val gazeSpeed = if (lastGazePx > 0f) gazeDistMoved / dt else 0f
+        lastGazePx = gazePx
+        lastGazePy = gazePy
+
+        // If gaze is moving rapidly across the screen, child is in "Looking Around" mode (no bubble pop/lock)
+        val isLookingAroundFast = gazeSpeed > (750f * density)
+
         var bestTargetIdx: Int? = null
         var bestDist = Float.MAX_VALUE
 
-        if (state.gazeData.isFaceDetected) {
+        if (state.gazeData.isFaceDetected && !isLookingAroundFast) {
             for (i in bubbles.indices) {
                 val b = bubbles[i]
                 if (b.isPopping) continue
@@ -224,9 +247,10 @@ class BubbleBloomRenderer {
                 val bx = b.x * width
                 val by = b.y * height
                 val r = b.baseRadius * scale
+                val catchDist = r + effectRadiusPx * 0.75f
 
                 val dist = hypot(gazePx - bx, gazePy - by)
-                if (dist < r * 1.25f && dist < bestDist) {
+                if (dist < catchDist && dist < bestDist) {
                     bestDist = dist
                     bestTargetIdx = i
                 }
@@ -252,7 +276,7 @@ class BubbleBloomRenderer {
                 continue
             }
 
-            // Gaze Dwell accumulation
+            // Gaze Dwell accumulation (Only accumulates when steady IN FOCUS on this bubble)
             if (isTargeted) {
                 b.dwellTimer += dt
                 currentDwellProgress = (b.dwellTimer / dwellTargetSec).coerceIn(0f, 1f)
@@ -264,10 +288,12 @@ class BubbleBloomRenderer {
                     totalPoppedCount++
                     b.popRuptureAngle = ((Math.random() - 0.5) * 0.8).toFloat()
                     spawnPopShards(b, width, height, scale)
+                    val pitch = (60f / b.baseRadius).coerceIn(0.80f, 1.40f)
+                    onBubblePopped?.invoke(pitch)
                     continue
                 }
             } else {
-                b.dwellTimer = (b.dwellTimer - dt * 1.5f).coerceAtLeast(0f)
+                b.dwellTimer = (b.dwellTimer - dt * 2.0f).coerceAtLeast(0f)
             }
 
             // Bubble Buoyancy & Drift Movement
@@ -292,9 +318,17 @@ class BubbleBloomRenderer {
             renderIridescentSoapBubble(drawScope, b, bx, by, currentRadius, isTargeted, b.dwellTimer / dwellTargetSec)
         }
 
-        // 4. Render Eye Gaze Reticle
+        // 4. Render Eye Gaze Reticle (Looking Around Mode vs In Focus Mode with Gaze Effect Area)
         if (state.gazeData.isFaceDetected && state.showGazeMarker) {
-            renderGazeReticleSmall(drawScope, state, gazePx, gazePy, activeFocusedIndex != null)
+            gazeMarkerRenderer.render(
+                drawScope = drawScope,
+                state = state,
+                gazePx = gazePx,
+                gazePy = gazePy,
+                isFocused = (activeFocusedIndex != null),
+                dwellProgress = currentDwellProgress,
+                deltaTime = dt
+            )
         }
     }
 

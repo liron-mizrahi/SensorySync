@@ -119,6 +119,9 @@ data class ControlState(
     val gazeMarkerSize: Float = 1.0f,
     val gazeMarkerOpacity: Float = 0.8f,
     val gazeMarkerColor: String = "CYAN",
+    val gazeEffectRadiusDp: Float = 80.0f,
+    val showGazeEffectRadius: Boolean = true,
+    val bubblePopSoundEnabled: Boolean = true,
 
     // Get Attention Rainbow Boundary Band & Audio Stimulation
     val isAttentionActive: Boolean = false,

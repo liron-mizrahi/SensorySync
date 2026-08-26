@@ -61,6 +61,9 @@ data class ParentControlState(
     val gazeMarkerSize: Float = 1.0f,
     val gazeMarkerOpacity: Float = 0.8f,
     val gazeMarkerColor: String = "CYAN",
+    val gazeEffectRadiusDp: Float = 80.0f,
+    val showGazeEffectRadius: Boolean = true,
+    val bubblePopSoundEnabled: Boolean = true,
 
     // Get Attention Rainbow Boundary Band & Audio Stimulation
     val isAttentionActive: Boolean = false,
@@ -188,6 +191,9 @@ class ParentMqttClient(
                     gazeMarkerSize = json.optDouble("gazeMarkerSize", 1.0).toFloat(),
                     gazeMarkerOpacity = json.optDouble("gazeMarkerOpacity", 0.8).toFloat(),
                     gazeMarkerColor = json.optString("gazeMarkerColor", "CYAN"),
+                    gazeEffectRadiusDp = json.optDouble("gazeEffectRadiusDp", 80.0).toFloat(),
+                    showGazeEffectRadius = json.optBoolean("showGazeEffectRadius", true),
+                    bubblePopSoundEnabled = json.optBoolean("bubblePopSoundEnabled", true),
                     isAttentionActive = json.optBoolean("isAttentionActive", false),
                     attentionDurationSec = json.optDouble("attentionDurationSec", 4.0).toFloat(),
                     attentionOpacity = json.optDouble("attentionOpacity", 0.85).toFloat(),
@@ -265,6 +271,19 @@ class ParentMqttClient(
                 }
                 "gaze_marker_color", "marker_color" -> {
                     onStateUpdate { copy(gazeMarkerColor = payload.uppercase()) }
+                }
+                "gaze_effect_radius", "gaze_radius", "effect_radius" -> {
+                    payload.toFloatOrNull()?.let { radius ->
+                        onStateUpdate { copy(gazeEffectRadiusDp = radius) }
+                    }
+                }
+                "show_gaze_effect_radius", "show_effect_radius" -> {
+                    val show = payload.toBooleanStrictOrNull() ?: (payload == "1" || payload.equals("true", ignoreCase = true))
+                    onStateUpdate { copy(showGazeEffectRadius = show) }
+                }
+                "bubble_pop_sound", "bubble_pop_sound_enabled" -> {
+                    val enabled = payload.toBooleanStrictOrNull() ?: (payload == "1" || payload.equals("true", ignoreCase = true))
+                    onStateUpdate { copy(bubblePopSoundEnabled = enabled) }
                 }
                 "pattern" -> {
                     payload.toIntOrNull()?.let { pId ->

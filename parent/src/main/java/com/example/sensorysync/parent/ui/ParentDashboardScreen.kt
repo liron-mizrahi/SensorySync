@@ -862,6 +862,37 @@ fun ParentDashboardScreen(
                                 valueRange = 0.5f..3.0f
                             )
                         }
+
+                        // Bubble Pop Sound Effect Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (state.bubblePopSoundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                    contentDescription = "Pop Sound",
+                                    tint = if (state.bubblePopSoundEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text("Bubble Pop Sound Effect", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                    Text("Plays acoustic pop sound when bubble pops", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Switch(
+                                checked = state.bubblePopSoundEnabled,
+                                onCheckedChange = { isChecked ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "bubble_pop_sound", isChecked.toString())
+                                    }
+                                },
+                                enabled = isOnline,
+                                modifier = Modifier.scale(0.8f)
+                            )
+                        }
                     }
                 }
             } else {
@@ -1095,6 +1126,76 @@ fun ParentDashboardScreen(
                                         modifier = Modifier.height(32.dp)
                                     )
                                 }
+                            }
+                        }
+
+                        // Gaze Effect Reach Radius Slider
+                        Column {
+                            Text(
+                                text = "Gaze Interaction Radius: ${state.gazeEffectRadiusDp.toInt()} dp",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Catchment area around gaze required to lock onto bubbles & attract jellyfish",
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = state.gazeEffectRadiusDp.coerceIn(30.0f, 200.0f),
+                                onValueChange = { radius ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "gaze_effect_radius", "%.0f".format(radius))
+                                    }
+                                },
+                                enabled = isOnline,
+                                valueRange = 30.0f..200.0f
+                            )
+                        }
+
+                        // Catchment Area Visibility Toggle Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Show Reach Radius on Marker",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Displays subtle glowing reach perimeter circle",
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = state.showGazeEffectRadius,
+                                onCheckedChange = { isChecked ->
+                                    if (isOnline) {
+                                        mqttClient.sendCommand(state.topicPrefix, "show_gaze_effect_radius", isChecked.toString())
+                                    }
+                                },
+                                enabled = isOnline,
+                                modifier = Modifier.scale(0.8f)
+                            )
+                        }
+
+                        // Visual Mode Indicator Card
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("🎯 Marker Visual Modes:", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("• Looking Around: 💠 Rotating Diamond Star (active scanning, won't pop bubbles)", fontSize = 9.sp, color = Color(0xFF00E5FF))
+                                Text("• In Focus: 🎯 Solid Dual Reticle + Dwell Ring (steady fixation, pops bubbles)", fontSize = 9.sp, color = Color(0xFF00E676))
                             }
                         }
                     }

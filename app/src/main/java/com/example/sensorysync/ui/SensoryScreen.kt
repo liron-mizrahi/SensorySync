@@ -56,6 +56,14 @@ fun SensoryScreen(
         }
     }
 
+    LaunchedEffect(state.bubblePopSoundEnabled) {
+        bubbleRenderer.onBubblePopped = { pitch ->
+            if (state.bubblePopSoundEnabled) {
+                attentionAudioPlayer.playBubblePop(pitch)
+            }
+        }
+    }
+
     LaunchedEffect(state.bubbleActionTrigger) {
         val trigger = state.bubbleActionTrigger ?: return@LaunchedEffect
         when {
